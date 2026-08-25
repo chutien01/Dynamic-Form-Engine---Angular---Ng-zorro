@@ -1,0 +1,65 @@
+<div class="flex flex-col h-screen w-full bg-gray-100 overflow-hidden font-sans">
+  <!-- Header -->
+  <div class="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-6 shadow-sm z-20">
+    <h1 class="font-bold text-xl text-gray-800 flex items-center gap-2">
+      <span>🛠️</span> Dynamic Form Builder
+    </h1>
+    <div class="flex gap-3">
+        <button class="px-4 py-1.5 bg-gray-200 text-gray-700 font-medium rounded hover:bg-gray-300 transition-colors" (click)="openJsonEditor()">
+          Edit JSON
+        </button>
+        <button class="px-4 py-1.5 bg-gray-200 text-gray-700 font-medium rounded hover:bg-gray-300 transition-colors" (click)="exportJson()">
+          Export JSON
+        </button>
+        <button class="px-4 py-1.5 bg-blue-600 text-white font-medium rounded hover:bg-blue-700 transition-colors" (click)="togglePreview()">
+          {{ isPreviewMode() ? 'Back to Editor' : 'Preview Form' }}
+        </button>
+    </div>
+  </div>
+
+  <!-- Main Body -->
+  <div class="flex flex-1 overflow-hidden">
+    <!-- Toolbox Column (Left) -->
+    @if (!isPreviewMode()) {
+      <div class="w-72 flex-shrink-0 z-10 relative bg-white border-r border-gray-200">
+        <app-toolbox></app-toolbox>
+      </div>
+    }
+
+    <!-- Canvas Column (Full Remaining Space) -->
+    <div class="flex-grow z-0 overflow-y-auto bg-gray-100">
+      @if (!isPreviewMode()) {
+        <app-canvas></app-canvas>
+      } @else {
+        <div class="p-8 h-full overflow-y-auto">
+            <div class="max-w-4xl mx-auto bg-white p-8 rounded-lg shadow-md border border-gray-200">
+              <h2 class="text-2xl font-bold mb-2">{{ state.schema().title }}</h2>
+              <p class="text-gray-500 mb-6">{{ state.schema().description }}</p>
+              <app-dynamic-form [schema]="state.schema()" (formSubmit)="onPreviewSubmit($event)"></app-dynamic-form>
+            </div>
+        </div>
+      }
+    </div>
+  </div>
+</div>
+
+<!-- Field Configuration Modal Popup -->
+<app-field-config-modal></app-field-config-modal>
+
+<!-- JSON Editor Modal -->
+<nz-modal 
+  [nzVisible]="isJsonModalVisible()" 
+  nzTitle="Edit JSON Schema" 
+  (nzOnCancel)="closeJsonEditor()" 
+  (nzOnOk)="saveJson()"
+  nzWidth="800px"
+  nzOkText="Apply Changes"
+  [nzBodyStyle]="{ padding: '0', height: '600px', display: 'flex', 'flex-direction': 'column' }">
+  <ng-container *nzModalContent>
+    <div style="flex-grow: 1; height: 100%; min-height: 0;">
+      @if (isJsonModalVisible() && editorData()) {
+        <json-editor [options]="editorOptions" [data]="editorData()!" #jsonEditor style="height: 100%; display: block;"></json-editor>
+      }
+    </div>
+  </ng-container>
+</nz-modal>

@@ -3,6 +3,7 @@ import {
   FieldOption,
   FieldType,
   FieldValidation,
+  FieldConditions,
   BaseFieldSchema,
 } from '../../models/schema.model';
 
@@ -48,6 +49,11 @@ export abstract class BaseFieldBuilder<T extends BaseFieldSchema> {
 
   setValidations(validations: FieldValidation): this {
     this.schema.validations = validations;
+    return this;
+  }
+
+  setConditions(conditions: FieldConditions): this {
+    this.schema.conditions = conditions;
     return this;
   }
 

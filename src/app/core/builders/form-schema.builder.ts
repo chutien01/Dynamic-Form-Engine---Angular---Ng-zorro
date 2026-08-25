@@ -36,7 +36,7 @@ export class FormSchemaBuilder {
   updateField(fieldId: string, updatedField: Partial<FieldSchema>): this {
     const index = this.formSchema.fields.findIndex(f => f.id === fieldId);
     if (index !== -1) {
-      this.formSchema.fields[index] = { ...this.formSchema.fields[index], ...updatedField };
+      this.formSchema.fields[index] = { ...this.formSchema.fields[index], ...updatedField } as FieldSchema;
     }
     return this;
   }

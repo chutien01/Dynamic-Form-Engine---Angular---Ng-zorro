@@ -7,6 +7,15 @@ import { SelectFieldBuilder } from './select/select-field.builder';
 import { RadioFieldBuilder } from './radio/radio-field.builder';
 import { CheckboxFieldBuilder } from './checkbox/checkbox-field.builder';
 import { DateFieldBuilder } from './date/date-field.builder';
+import { SwitchFieldBuilder } from './switch/switch-field.builder';
+import { DateRangeFieldBuilder } from './date-range/date-range-field.builder';
+import { RateFieldBuilder } from './rate/rate-field.builder';
+import { SliderFieldBuilder } from './slider/slider-field.builder';
+import { FileUploadFieldBuilder } from './file-upload/file-upload-field.builder';
+import { CardFieldBuilder } from './containers/card-field.builder';
+import { TabsFieldBuilder } from './containers/tabs-field.builder';
+import { CollapseFieldBuilder } from './containers/collapse-field.builder';
+import { StepsFieldBuilder } from './containers/steps-field.builder';
 
 export class FieldBuilderFactory {
   static create(type: FieldType | string): BaseFieldBuilder<any> {
@@ -36,6 +45,33 @@ export class FieldBuilderFactory {
       case FieldType.DATE:
       case 'date':
         return new DateFieldBuilder();
+      case FieldType.SWITCH:
+      case 'switch':
+        return new SwitchFieldBuilder();
+      case FieldType.DATE_RANGE:
+      case 'date_range':
+        return new DateRangeFieldBuilder();
+      case FieldType.RATE:
+      case 'rate':
+        return new RateFieldBuilder();
+      case FieldType.SLIDER:
+      case 'slider':
+        return new SliderFieldBuilder();
+      case FieldType.FILE_UPLOAD:
+      case 'file_upload':
+        return new FileUploadFieldBuilder();
+      case FieldType.CARD:
+      case 'card':
+        return new CardFieldBuilder();
+      case FieldType.TABS:
+      case 'tabs':
+        return new TabsFieldBuilder();
+      case FieldType.COLLAPSE:
+      case 'collapse':
+        return new CollapseFieldBuilder();
+      case FieldType.STEPS:
+      case 'steps':
+        return new StepsFieldBuilder();
       default: throw new Error(`Unsupported field type: ${type}`);
     }
   }

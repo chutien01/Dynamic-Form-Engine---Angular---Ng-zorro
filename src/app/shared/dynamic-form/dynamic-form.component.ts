@@ -1,7 +1,10 @@
-import { Component, effect, input, output, Type, inject, ChangeDetectionStrategy } from '@angular/core';
+import { Component, effect, input, output, Type, inject, signal, ChangeDetectorRef, ChangeDetectionStrategy } from '@angular/core';
 import { AbstractControl, FormControl, FormGroup, ReactiveFormsModule, ValidatorFn, Validators } from '@angular/forms';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NgComponentOutlet } from '@angular/common';
 import { FormSchema, FieldSchema, FieldType } from '../../core/models/schema.model';
+import { ConditionEvaluatorService } from '../../core/services/condition-evaluator.service';
+import { extractAllLeafFields, extractAllFieldsRecursive } from '../../core/utils/schema.utils';
 import { NzFormModule } from 'ng-zorro-antd/form';
 import { NzButtonModule } from 'ng-zorro-antd/button';
 import { NzGridModule } from 'ng-zorro-antd/grid';
@@ -25,20 +28,68 @@ export class DynamicFormComponent {
   readonly formSubmit = output<Record<string, unknown>>();
 
   readonly formGroup = new FormGroup({});
+  readonly formValues = signal<Record<string, unknown>>({});
 
   private readonly registry = inject(FieldRegistryService);
+  private readonly evaluator = inject(ConditionEvaluatorService);
+  private readonly cdr = inject(ChangeDetectorRef);
 
   constructor() {
+    this.formGroup.valueChanges
+      .pipe(takeUntilDestroyed())
+      .subscribe(() => {
+        this.formValues.set(this.formGroup.getRawValue());
+        this.applyConditionalStates();
+        this.cdr.markForCheck();
+      });
+
     effect(() => {
       const currentSchema = this.schema();
       if (currentSchema) {
         this.syncFormControls(currentSchema);
+        this.formValues.set(this.formGroup.getRawValue());
+        this.applyConditionalStates();
+        this.cdr.markForCheck();
       }
     });
   }
 
   getComponentForType(type: FieldType): Type<unknown> {
     return this.registry.getComponent(type);
+  }
+
+  isFieldVisible(field: FieldSchema): boolean {
+    return this.evaluator.isFieldVisible(field, this.formValues(), this.schema());
+  }
+
+  private applyConditionalStates(): void {
+    const currentSchema = this.schema();
+    if (!currentSchema?.fields) return;
+
+    const values = this.formValues();
+    const allFields = extractAllFieldsRecursive(currentSchema.fields);
+
+    allFields.forEach(field => {
+      const controlKey = field.key || field.id;
+      const control = this.formGroup.get(controlKey);
+      if (!control) return;
+
+      const isVisible = this.evaluator.isFieldVisible(field, values, currentSchema);
+      const shouldDisable = this.evaluator.isFieldDisabled(field, values, currentSchema);
+
+      if (!isVisible) {
+        // Tạm thời disable khi field bị ẩn để không chặn validation của toàn bộ form
+        if (control.enabled) {
+          control.disable({ emitEvent: false });
+        }
+      } else {
+        if (shouldDisable && control.enabled) {
+          control.disable();
+        } else if (!shouldDisable && control.disabled) {
+          control.enable();
+        }
+      }
+    });
   }
 
   private buildValidators(field: FieldSchema): ValidatorFn[] {
@@ -59,8 +110,9 @@ export class DynamicFormComponent {
 
   private syncFormControls(schema: FormSchema): void {
     const activeKeys = new Set<string>();
+    const leafFields = extractAllLeafFields(schema.fields);
 
-    schema.fields.forEach((field: FieldSchema) => {
+    leafFields.forEach((field: FieldSchema) => {
       const controlKey = field.key || field.id;
       activeKeys.add(controlKey);
       const validators = this.buildValidators(field);

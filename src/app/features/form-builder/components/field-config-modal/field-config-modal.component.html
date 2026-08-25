@@ -1,0 +1,632 @@
+<nz-modal
+  [nzVisible]="state.isConfigModalOpen() && !!state.activeField()"
+  [nzTitle]="modalTitleTpl"
+  (nzOnCancel)="onCancel()"
+  nzWidth="1050px"
+  [nzFooter]="null"
+  [nzBodyStyle]="{ padding: '0', height: '620px', display: 'flex', 'overflow': 'hidden' }"
+>
+  <!-- Modal Header Template -->
+  <ng-template #modalTitleTpl>
+    <div class="flex items-center justify-between pr-8">
+      <div class="flex items-center gap-2">
+        <span class="text-xl">⚙️</span>
+        <span class="font-bold text-gray-800 text-lg">
+          {{ state.activeField()?.label || state.activeField()?.type }} Component
+        </span>
+        <span class="text-xs font-mono bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-200">
+          {{ state.activeField()?.type }}
+        </span>
+      </div>
+    </div>
+  </ng-template>
+
+  <!-- Modal Body: 2 Columns Split Layout -->
+  <ng-container *nzModalContent>
+    @if (state.activeField()) {
+      <div class="flex w-full h-full overflow-hidden bg-gray-50">
+        
+        <!-- ==================== LEFT COLUMN: CONFIGURATION TABS ==================== -->
+        <div 
+          class="h-full overflow-y-auto p-5 bg-white border-r border-gray-200 transition-all"
+          [class.w-full]="!showPreview()"
+          [class.w-7/12]="showPreview()"
+        >
+          <form nz-form [nzLayout]="'vertical'" [formGroup]="formGroup">
+            <nz-tabs [nzType]="'line'" class="w-full">
+              
+              <!-- ==================== TAB 1: DISPLAY ==================== -->
+              <nz-tab nzTitle="Display">
+                <div class="pt-3 space-y-4">
+                  <!-- Label -->
+                  <nz-form-item class="!mb-3">
+                    <nz-form-label nzRequired>Label (Nhãn hiển thị)</nz-form-label>
+                    <nz-form-control>
+                      <input nz-input formControlName="label" placeholder="e.g. Full Name, Email Address" />
+                    </nz-form-control>
+                  </nz-form-item>
+
+                  <!-- Label Position -->
+                  <nz-form-item class="!mb-3">
+                    <nz-form-label>Label Position (Vị trí nhãn)</nz-form-label>
+                    <nz-form-control>
+                      <nz-select formControlName="labelPosition" style="width: 100%;">
+                        <nz-option nzValue="top" nzLabel="Top (Phía trên)"></nz-option>
+                        <nz-option nzValue="left" nzLabel="Left (Bên trái)"></nz-option>
+                        <nz-option nzValue="right" nzLabel="Right (Bên phải)"></nz-option>
+                      </nz-select>
+                    </nz-form-control>
+                  </nz-form-item>
+
+                  <!-- Placeholder -->
+                  @if (hasPlaceholder()) {
+                    <nz-form-item class="!mb-3">
+                      <nz-form-label>Placeholder</nz-form-label>
+                      <nz-form-control>
+                        <input nz-input formControlName="placeholder" placeholder="e.g. Enter your name..." />
+                      </nz-form-control>
+                    </nz-form-item>
+                  }
+
+                  <!-- Description / Help text -->
+                  <nz-form-item class="!mb-3">
+                    <nz-form-label>Description (Mô tả trợ giúp bên dưới)</nz-form-label>
+                    <nz-form-control>
+                      <textarea nz-input formControlName="description" rows="2" placeholder="Description for this field..."></textarea>
+                    </nz-form-control>
+                  </nz-form-item>
+
+                  <!-- Tooltip -->
+                  <nz-form-item class="!mb-3">
+                    <nz-form-label>Tooltip (Gợi ý khi hover icon)</nz-form-label>
+                    <nz-form-control>
+                      <input nz-input formControlName="tooltip" placeholder="Tooltip text..." />
+                    </nz-form-control>
+                  </nz-form-item>
+
+                  <!-- Prefix & Suffix -->
+                  <div class="grid grid-cols-2 gap-3">
+                    <nz-form-item class="!mb-3">
+                      <nz-form-label>Prefix (Tiền tố)</nz-form-label>
+                      <nz-form-control>
+                        <input nz-input formControlName="prefix" placeholder="e.g. $, @" />
+                      </nz-form-control>
+                    </nz-form-item>
+                    <nz-form-item class="!mb-3">
+                      <nz-form-label>Suffix (Hậu tố)</nz-form-label>
+                      <nz-form-control>
+                        <input nz-input formControlName="suffix" placeholder="e.g. kg, USD, .com" />
+                      </nz-form-control>
+                    </nz-form-item>
+                  </div>
+
+                  <!-- Grid Span -->
+                  <nz-form-item class="!mb-3">
+                    <nz-form-label>Grid Span (Độ rộng cột 1-24)</nz-form-label>
+                    <nz-form-control>
+                      <nz-input-number formControlName="gridSpan" [nzMin]="1" [nzMax]="24" style="width: 100%;"></nz-input-number>
+                    </nz-form-control>
+                  </nz-form-item>
+
+                  <!-- Disabled & Hidden Switches -->
+                  <div class="grid grid-cols-2 gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <nz-form-item class="!mb-0">
+                      <nz-form-label>Disabled</nz-form-label>
+                      <nz-form-control>
+                        <nz-switch formControlName="disabled"></nz-switch>
+                      </nz-form-control>
+                    </nz-form-item>
+                    <nz-form-item class="!mb-0">
+                      <nz-form-label>Hidden</nz-form-label>
+                      <nz-form-control>
+                        <nz-switch formControlName="hidden"></nz-switch>
+                      </nz-form-control>
+                    </nz-form-item>
+                  </div>
+                </div>
+              </nz-tab>
+
+              <!-- ==================== TAB 2: DATA ==================== -->
+              <nz-tab nzTitle="Data">
+                <div class="pt-3 space-y-4">
+                  <!-- Payload Key -->
+                  <nz-form-item class="!mb-3">
+                    <nz-form-label nzRequired>Property Name (Payload Key)</nz-form-label>
+                    <nz-form-control nzExtra="Tên key định danh dữ liệu trả về khi submit form">
+                      <input nz-input formControlName="key" placeholder="e.g. user_email, age" />
+                    </nz-form-control>
+                  </nz-form-item>
+
+                  <!-- Default Value -->
+                  <nz-form-item class="!mb-3">
+                    <nz-form-label>Default Value (Giá trị mặc định)</nz-form-label>
+                    <nz-form-control>
+                      <input nz-input formControlName="defaultValue" placeholder="Default value..." />
+                    </nz-form-control>
+                  </nz-form-item>
+
+                  <!-- Options Data (For Select / Radio / Checkbox) -->
+                  @if (hasOptions()) {
+                    <div class="border-t pt-3">
+                      <div class="flex items-center justify-between mb-2">
+                        <span class="font-semibold text-gray-700 text-sm">Options Values (Danh sách lựa chọn)</span>
+                      </div>
+                      <div formArrayName="options" class="space-y-2">
+                        @for (opt of optionsArray.controls; track $index) {
+                          <div [formGroupName]="$index" class="flex gap-2 items-center">
+                            <input nz-input formControlName="label" placeholder="Label (Hiển thị)" class="w-1/2" />
+                            <input nz-input formControlName="value" placeholder="Value (Giá trị)" class="w-1/2" />
+                            <button type="button" nz-button nzType="text" nzDanger (click)="removeOption($index)">✕</button>
+                          </div>
+                        }
+                      </div>
+                      <button type="button" nz-button nzType="dashed" class="w-full mt-2" (click)="addOption()">+ Thêm Option</button>
+                    </div>
+                  }
+
+                  <!-- Range Settings (Number & Slider) -->
+                  @if (hasRange()) {
+                    <div class="border-t pt-3">
+                      <span class="font-semibold text-gray-700 text-sm block mb-2">Range & Step Settings</span>
+                      <div class="grid grid-cols-3 gap-2">
+                        <nz-form-item class="!mb-2">
+                          <nz-form-label>Min</nz-form-label>
+                          <nz-form-control>
+                            <nz-input-number formControlName="min" style="width: 100%"></nz-input-number>
+                          </nz-form-control>
+                        </nz-form-item>
+                        <nz-form-item class="!mb-2">
+                          <nz-form-label>Max</nz-form-label>
+                          <nz-form-control>
+                            <nz-input-number formControlName="max" style="width: 100%"></nz-input-number>
+                          </nz-form-control>
+                        </nz-form-item>
+                        <nz-form-item class="!mb-2">
+                          <nz-form-label>Step</nz-form-label>
+                          <nz-form-control>
+                            <nz-input-number formControlName="step" [nzMin]="0.1" style="width: 100%"></nz-input-number>
+                          </nz-form-control>
+                        </nz-form-item>
+                      </div>
+                    </div>
+                  }
+
+                  <!-- Rate Specific Settings -->
+                  @if (isRateField()) {
+                    <div class="border-t pt-3">
+                      <span class="font-semibold text-gray-700 text-sm block mb-2">Rating Settings</span>
+                      <div class="grid grid-cols-2 gap-3">
+                        <nz-form-item class="!mb-2">
+                          <nz-form-label>Star Count (Số sao)</nz-form-label>
+                          <nz-form-control>
+                            <nz-input-number formControlName="count" [nzMin]="1" [nzMax]="10" style="width: 100%"></nz-input-number>
+                          </nz-form-control>
+                        </nz-form-item>
+                        <nz-form-item class="!mb-2">
+                          <nz-form-label>Allow Half (Nửa sao)</nz-form-label>
+                          <nz-form-control>
+                            <nz-switch formControlName="allowHalf"></nz-switch>
+                          </nz-form-control>
+                        </nz-form-item>
+                      </div>
+                    </div>
+                  }
+
+                  <!-- File Upload Specific Settings -->
+                  @if (isFileUploadField()) {
+                    <div class="border-t pt-3">
+                      <span class="font-semibold text-gray-700 text-sm block mb-2">Upload Settings</span>
+                      <div class="grid grid-cols-2 gap-3">
+                        <nz-form-item class="!mb-2">
+                          <nz-form-label>Max File Count</nz-form-label>
+                          <nz-form-control>
+                            <nz-input-number formControlName="maxCount" [nzMin]="1" [nzMax]="10" style="width: 100%"></nz-input-number>
+                          </nz-form-control>
+                        </nz-form-item>
+                        <nz-form-item class="!mb-2">
+                          <nz-form-label>Accepted File Types</nz-form-label>
+                          <nz-form-control>
+                            <input nz-input formControlName="accept" placeholder="e.g. .pdf,image/*" />
+                          </nz-form-control>
+                        </nz-form-item>
+                      </div>
+                    </div>
+                  }
+                </div>
+              </nz-tab>
+
+              <!-- ==================== TAB 3: VALIDATION ==================== -->
+              <nz-tab nzTitle="Validation">
+                <div class="pt-3 space-y-4">
+                  <!-- Required Switch -->
+                  <div class="p-3 bg-red-50/50 rounded-lg border border-red-100 flex items-center justify-between">
+                    <div>
+                      <span class="font-semibold text-gray-800 text-sm block">Required (Bắt buộc nhập)</span>
+                      <span class="text-xs text-gray-500">Trường này phải có giá trị khi gửi biểu mẫu</span>
+                    </div>
+                    <nz-switch formControlName="required"></nz-switch>
+                  </div>
+
+                  <!-- Length & Value Validations -->
+                  <div class="grid grid-cols-2 gap-3">
+                    <nz-form-item class="!mb-3">
+                      <nz-form-label>Minimum Length (Độ dài tối thiểu)</nz-form-label>
+                      <nz-form-control>
+                        <nz-input-number formControlName="minLength" [nzMin]="0" style="width: 100%;"></nz-input-number>
+                      </nz-form-control>
+                    </nz-form-item>
+                    <nz-form-item class="!mb-3">
+                      <nz-form-label>Maximum Length (Độ dài tối đa)</nz-form-label>
+                      <nz-form-control>
+                        <nz-input-number formControlName="maxLength" [nzMin]="1" style="width: 100%;"></nz-input-number>
+                      </nz-form-control>
+                    </nz-form-item>
+                  </div>
+
+                  <!-- Pattern (Regex) -->
+                  <nz-form-item class="!mb-3">
+                    <nz-form-label>Regular Expression Pattern (Biểu thức chính quy)</nz-form-label>
+                    <nz-form-control nzExtra="e.g. ^[0-9]+$ hoặc ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$">
+                      <input nz-input formControlName="pattern" placeholder="e.g. ^[0-9]+$" />
+                    </nz-form-control>
+                  </nz-form-item>
+
+                  <!-- Custom Error Message -->
+                  <nz-form-item class="!mb-3">
+                    <nz-form-label>Custom Error Message (Thông báo lỗi tùy biến)</nz-form-label>
+                    <nz-form-control>
+                      <input nz-input formControlName="customErrorMessage" placeholder="e.g. Vui lòng nhập đúng định dạng số điện thoại" />
+                    </nz-form-control>
+                  </nz-form-item>
+                </div>
+              </nz-tab>
+
+              <!-- ==================== TAB 4: CONDITIONAL ==================== -->
+              <nz-tab nzTitle="Conditional">
+                <div class="pt-3 space-y-4">
+                  <div class="p-3 bg-amber-50/60 rounded-lg border border-amber-200 flex items-center justify-between">
+                    <div>
+                      <span class="font-semibold text-amber-900 text-sm flex items-center gap-1">
+                        <span>⚡</span> Kích hoạt Conditional Logic
+                      </span>
+                      <span class="text-xs text-amber-700">Tự động ẩn/hiện hoặc bật/tắt trường này dựa vào giá trị trường khác</span>
+                    </div>
+                    <nz-switch formControlName="enableConditions"></nz-switch>
+                  </div>
+
+                  @if (formGroup.controls.enableConditions.value) {
+                    @if (availableTriggerFields().length === 0) {
+                      <div class="text-xs text-amber-600 bg-amber-50 p-3 rounded border border-amber-200">
+                        Cần có ít nhất 1 trường khác trên form để thiết lập điều kiện.
+                      </div>
+                    } @else {
+                      <div class="space-y-3 pt-2">
+                        <!-- Action -->
+                        <nz-form-item class="!mb-2">
+                          <nz-form-label nzRequired>Hành động (Action)</nz-form-label>
+                          <nz-form-control>
+                            <nz-select formControlName="conditionAction" style="width: 100%;">
+                              <nz-option nzValue="show" nzLabel="Hiển thị khi thỏa mãn (Show when)"></nz-option>
+                              <nz-option nzValue="hide" nzLabel="Ẩn đi khi thỏa mãn (Hide when)"></nz-option>
+                              <nz-option nzValue="enable" nzLabel="Bật (Enable when)"></nz-option>
+                              <nz-option nzValue="disable" nzLabel="Vô hiệu hóa (Disable when)"></nz-option>
+                            </nz-select>
+                          </nz-form-control>
+                        </nz-form-item>
+
+                        <!-- Trigger Field -->
+                        <nz-form-item class="!mb-2">
+                          <nz-form-label nzRequired>Dựa trên trường (When field)</nz-form-label>
+                          <nz-form-control>
+                            <nz-select formControlName="conditionFieldKey" nzPlaceHolder="Chọn trường kích hoạt" style="width: 100%;">
+                              @for (f of availableTriggerFields(); track f.id) {
+                                <nz-option [nzValue]="f.key || f.id" [nzLabel]="(f.label || 'Unnamed') + ' (' + (f.key || f.id) + ')'"></nz-option>
+                              }
+                            </nz-select>
+                          </nz-form-control>
+                        </nz-form-item>
+
+                        <!-- Operator -->
+                        <nz-form-item class="!mb-2">
+                          <nz-form-label nzRequired>Toán tử so sánh</nz-form-label>
+                          <nz-form-control>
+                            <nz-select formControlName="conditionOperator" style="width: 100%;">
+                              <nz-option nzValue="equals" nzLabel="Bằng (Equals)"></nz-option>
+                              <nz-option nzValue="not_equals" nzLabel="Khác (Not Equals)"></nz-option>
+                              <nz-option nzValue="contains" nzLabel="Chứa (Contains)"></nz-option>
+                              <nz-option nzValue="is_empty" nzLabel="Trống (Is Empty)"></nz-option>
+                              <nz-option nzValue="is_not_empty" nzLabel="Không trống (Is Not Empty)"></nz-option>
+                              <nz-option nzValue="greater_than" nzLabel="Lớn hơn (>)"></nz-option>
+                              <nz-option nzValue="less_than" nzLabel="Nhỏ hơn (<)"></nz-option>
+                            </nz-select>
+                          </nz-form-control>
+                        </nz-form-item>
+
+                        <!-- Target Value -->
+                        @if (showConditionValueInput()) {
+                          <nz-form-item class="!mb-2">
+                            <nz-form-label nzRequired>Giá trị mong đợi (Expected Value)</nz-form-label>
+                            <nz-form-control>
+                              @if (triggerFieldOptions().length > 0) {
+                                <nz-select formControlName="conditionValue" nzPlaceHolder="Chọn giá trị" style="width: 100%;">
+                                  @for (opt of triggerFieldOptions(); track opt.value) {
+                                    <nz-option [nzValue]="opt.value" [nzLabel]="opt.label"></nz-option>
+                                  }
+                                </nz-select>
+                              } @else {
+                                <input nz-input formControlName="conditionValue" placeholder="Nhập giá trị so sánh" />
+                              }
+                            </nz-form-control>
+                          </nz-form-item>
+                        } @else {
+                          <div class="text-xs text-blue-600 bg-blue-50 p-2 rounded border border-blue-200">
+                            ℹ️ Toán tử <strong>{{ currentOperator() === 'is_empty' ? 'Trống (Is Empty)' : 'Không trống (Is Not Empty)' }}</strong> chỉ kiểm tra xem trường có dữ liệu hay không.
+                          </div>
+                        }
+                      </div>
+                    }
+                  }
+                </div>
+              </nz-tab>
+
+              <!-- ==================== TAB 5: API ==================== -->
+              <nz-tab nzTitle="API">
+                <div class="pt-3 space-y-4">
+                  <div class="p-3 bg-blue-50/50 rounded-lg border border-blue-100 text-xs text-blue-800">
+                    🌐 Cấu hình nguồn dữ liệu động từ REST API cho Select dropdown hoặc dữ liệu động.
+                  </div>
+
+                  <nz-form-item class="!mb-3">
+                    <nz-form-label>API Endpoint URL</nz-form-label>
+                    <nz-form-control>
+                      <input nz-input formControlName="apiUrl" placeholder="https://api.example.com/v1/options" />
+                    </nz-form-control>
+                  </nz-form-item>
+
+                  <div class="grid grid-cols-2 gap-3">
+                    <nz-form-item class="!mb-3">
+                      <nz-form-label>Method</nz-form-label>
+                      <nz-form-control>
+                        <nz-select formControlName="apiMethod" style="width: 100%;">
+                          <nz-option nzValue="GET" nzLabel="GET"></nz-option>
+                          <nz-option nzValue="POST" nzLabel="POST"></nz-option>
+                        </nz-select>
+                      </nz-form-control>
+                    </nz-form-item>
+
+                    <nz-form-item class="!mb-3">
+                      <nz-form-label>Response Data Path</nz-form-label>
+                      <nz-form-control nzExtra="e.g. data.items">
+                        <input nz-input formControlName="apiDataPath" placeholder="data.items" />
+                      </nz-form-control>
+                    </nz-form-item>
+                  </div>
+                </div>
+              </nz-tab>
+
+              <!-- ==================== TAB 6: LOGIC ==================== -->
+              <nz-tab nzTitle="Logic">
+                <div class="pt-3 space-y-4">
+                  <div class="p-3 bg-purple-50/50 rounded-lg border border-purple-100 text-xs text-purple-800">
+                    ⚡ Custom Business Logic Hooks & Actions (Hỗ trợ mở rộng tính toán công thức động).
+                  </div>
+
+                  <nz-form-item class="!mb-3">
+                    <nz-form-label>Custom Logic Script (JavaScript Expression)</nz-form-label>
+                    <nz-form-control>
+                      <textarea nz-input formControlName="customLogic" rows="5" placeholder="// e.g. return value * 2;"></textarea>
+                    </nz-form-control>
+                  </nz-form-item>
+                </div>
+              </nz-tab>
+
+              <!-- ==================== TAB 7: LAYOUT (For Containers) ==================== -->
+              @if (isContainerField()) {
+                <nz-tab nzTitle="Layout">
+                  <div class="pt-3 space-y-4">
+                    @if (isCardField()) {
+                      <nz-form-item class="!mb-3">
+                        <nz-form-label>Bordered (Có đường viền)</nz-form-label>
+                        <nz-form-control>
+                          <nz-switch formControlName="bordered"></nz-switch>
+                        </nz-form-control>
+                      </nz-form-item>
+                    }
+
+                    @if (isTabsField()) {
+                      <div class="grid grid-cols-2 gap-3">
+                        <nz-form-item class="!mb-3">
+                          <nz-form-label>Kiểu Tab</nz-form-label>
+                          <nz-form-control>
+                            <nz-select formControlName="tabType" style="width: 100%;">
+                              <nz-option nzValue="line" nzLabel="Line"></nz-option>
+                              <nz-option nzValue="card" nzLabel="Card"></nz-option>
+                            </nz-select>
+                          </nz-form-control>
+                        </nz-form-item>
+                        <nz-form-item class="!mb-3">
+                          <nz-form-label>Vị trí Tab</nz-form-label>
+                          <nz-form-control>
+                            <nz-select formControlName="tabPosition" style="width: 100%;">
+                              <nz-option nzValue="top" nzLabel="Top"></nz-option>
+                              <nz-option nzValue="left" nzLabel="Left"></nz-option>
+                              <nz-option nzValue="right" nzLabel="Right"></nz-option>
+                              <nz-option nzValue="bottom" nzLabel="Bottom"></nz-option>
+                            </nz-select>
+                          </nz-form-control>
+                        </nz-form-item>
+                      </div>
+                    }
+
+                    @if (isCollapseField()) {
+                      <div class="grid grid-cols-2 gap-3">
+                        <nz-form-item class="!mb-3">
+                          <nz-form-label>Accordion Mode</nz-form-label>
+                          <nz-form-control>
+                            <nz-switch formControlName="accordion"></nz-switch>
+                          </nz-form-control>
+                        </nz-form-item>
+                        <nz-form-item class="!mb-3">
+                          <nz-form-label>Bordered</nz-form-label>
+                          <nz-form-control>
+                            <nz-switch formControlName="bordered"></nz-switch>
+                          </nz-form-control>
+                        </nz-form-item>
+                      </div>
+                    }
+
+                    @if (isStepsField()) {
+                      <div class="grid grid-cols-2 gap-3">
+                        <nz-form-item class="!mb-3">
+                          <nz-form-label>Direction</nz-form-label>
+                          <nz-form-control>
+                            <nz-select formControlName="direction" style="width: 100%;">
+                              <nz-option nzValue="horizontal" nzLabel="Horizontal"></nz-option>
+                              <nz-option nzValue="vertical" nzLabel="Vertical"></nz-option>
+                            </nz-select>
+                          </nz-form-control>
+                        </nz-form-item>
+                        <nz-form-item class="!mb-3">
+                          <nz-form-label>Size</nz-form-label>
+                          <nz-form-control>
+                            <nz-select formControlName="size" style="width: 100%;">
+                              <nz-option nzValue="default" nzLabel="Default"></nz-option>
+                              <nz-option nzValue="small" nzLabel="Small"></nz-option>
+                            </nz-select>
+                          </nz-form-control>
+                        </nz-form-item>
+                      </div>
+                    }
+
+                    <!-- Items List (Tabs / Panels / Steps) -->
+                    @if (isContainerWithItems()) {
+                      <div class="border-t pt-3">
+                        <div class="flex items-center justify-between mb-2">
+                          <span class="font-semibold text-gray-700 text-sm">
+                            {{ isTabsField() ? 'Danh sách Tabs' : (isCollapseField() ? 'Danh sách Panels' : 'Danh sách Steps') }}
+                          </span>
+                        </div>
+                        <div formArrayName="items" class="space-y-2">
+                          @for (item of itemsArray.controls; track $index) {
+                            <div [formGroupName]="$index" class="p-2.5 bg-gray-50 rounded border border-gray-200">
+                              <div class="flex items-center gap-2 mb-1">
+                                <span class="text-xs font-mono text-gray-500 font-bold">#{{ $index + 1 }}</span>
+                                <input nz-input formControlName="title" placeholder="Tiêu đề" class="flex-1 font-medium" />
+                                <button type="button" nz-button nzType="text" nzDanger (click)="removeContainerItem($index)">✕</button>
+                              </div>
+                              @if (isStepsField()) {
+                                <input nz-input formControlName="description" placeholder="Mô tả phụ cho bước" class="text-xs" />
+                              }
+                            </div>
+                          }
+                        </div>
+                        <button type="button" nz-button nzType="dashed" class="w-full mt-2" (click)="addContainerItem()">
+                          + Thêm {{ isTabsField() ? 'Tab' : (isCollapseField() ? 'Panel' : 'Step') }}
+                        </button>
+                      </div>
+                    }
+                  </div>
+                </nz-tab>
+              }
+
+            </nz-tabs>
+          </form>
+        </div>
+
+        <!-- ==================== RIGHT COLUMN: LIVE PREVIEW & ACTIONS ==================== -->
+        @if (showPreview()) {
+          <div class="w-5/12 h-full flex flex-col justify-between p-5 bg-slate-50 overflow-hidden">
+            <!-- Preview Header -->
+            <div>
+              <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-200">
+                <div class="flex items-center gap-2">
+                  <span class="text-lg">👁️</span>
+                  <h3 class="font-bold text-gray-800 text-base">Preview</h3>
+                </div>
+                <span class="text-xs text-slate-400 font-medium">Live Real-time</span>
+              </div>
+
+              <!-- Preview Render Box -->
+              <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm min-h-[140px] max-h-[420px] overflow-y-auto">
+                @if (previewField(); as pField) {
+                  <ng-container *ngComponentOutlet="
+                    registry.getComponent(pField.type);
+                    inputs: { field: pField, formGroup: previewFormGroup, isBuilder: false }
+                  "></ng-container>
+                }
+              </div>
+            </div>
+
+            <!-- Bottom Action Buttons in Right Column -->
+            <div class="pt-4 border-t border-slate-200 flex flex-col gap-2.5">
+              <div class="flex gap-2">
+                <!-- Save Button (Green) -->
+                <button 
+                  type="button" 
+                  nz-button 
+                  nzType="primary" 
+                  class="flex-1 !bg-emerald-600 hover:!bg-emerald-700 !border-emerald-600 !font-semibold !rounded-lg !h-9 shadow-sm"
+                  (click)="onSave()"
+                >
+                  ✓ Save
+                </button>
+
+                <!-- Cancel Button (Dark Gray) -->
+                <button 
+                  type="button" 
+                  nz-button 
+                  class="!bg-slate-700 hover:!bg-slate-800 !text-white !border-slate-700 !font-semibold !rounded-lg !h-9 shadow-sm px-4"
+                  (click)="onCancel()"
+                >
+                  Cancel
+                </button>
+
+                <!-- Remove Button (Red) -->
+                <button 
+                  type="button" 
+                  nz-button 
+                  nzDanger 
+                  class="!font-semibold !rounded-lg !h-9 shadow-sm px-3"
+                  nz-popconfirm
+                  nzPopconfirmTitle="Bạn có chắc muốn xóa trường này khỏi form?"
+                  nzOkText="Xóa"
+                  nzCancelText="Hủy"
+                  nzOkDanger
+                  (nzOnConfirm)="onRemove()"
+                >
+                  Remove
+                </button>
+              </div>
+
+              <!-- Toggle Preview Button -->
+              <button 
+                type="button" 
+                nz-button 
+                nzType="default" 
+                class="w-full !text-xs !text-slate-600 hover:!text-slate-800 !rounded-lg !h-8"
+                (click)="togglePreview()"
+              >
+                Hide preview
+              </button>
+            </div>
+          </div>
+        } @else {
+          <!-- Collapsed Preview Button floating on right -->
+          <div class="p-3 flex items-start">
+            <button 
+              type="button" 
+              nz-button 
+              nzType="primary" 
+              nzSize="small" 
+              class="!text-xs !bg-blue-600 !rounded-lg"
+              (click)="togglePreview()"
+            >
+              👁️ Show preview
+            </button>
+          </div>
+        }
+
+      </div>
+    }
+  </ng-container>
+</nz-modal>
