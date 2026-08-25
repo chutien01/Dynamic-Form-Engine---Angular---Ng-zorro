@@ -1,5 +1,4 @@
 import { Component, input, ChangeDetectionStrategy } from '@angular/core';
-import { CommonModule } from '@angular/common';
 import { FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { NzSelectModule } from 'ng-zorro-antd/select';
 import { NzFormModule } from 'ng-zorro-antd/form';
@@ -7,7 +6,7 @@ import { SelectFieldSchema } from '../../../../core/models/schema.model';
 
 @Component({
   selector: 'app-select-field',
-  imports: [CommonModule, ReactiveFormsModule, NzSelectModule, NzFormModule],
+  imports: [ReactiveFormsModule, NzSelectModule, NzFormModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <nz-form-item [formGroup]="formGroup()">

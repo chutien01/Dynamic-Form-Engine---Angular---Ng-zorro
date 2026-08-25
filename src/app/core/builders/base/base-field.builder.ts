@@ -36,7 +36,7 @@ export abstract class BaseFieldBuilder<T extends BaseFieldSchema> {
     return this;
   }
 
-  setDefaultValue(value: any): this {
+  setDefaultValue(value: unknown): this {
     this.schema.defaultValue = value;
     return this;
   }

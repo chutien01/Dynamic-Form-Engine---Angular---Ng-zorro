@@ -1,5 +1,4 @@
-import { Component, effect, inject } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, effect, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { DragDropModule, CdkDragDrop } from '@angular/cdk/drag-drop';
 import { NzGridModule } from 'ng-zorro-antd/grid';
 import { NzButtonModule } from 'ng-zorro-antd/button';
@@ -7,9 +6,10 @@ import { NzDropDownModule } from 'ng-zorro-antd/dropdown';
 import { NzTooltipModule } from 'ng-zorro-antd/tooltip';
 import { NzPopconfirmModule } from 'ng-zorro-antd/popconfirm';
 import { NzMessageService } from 'ng-zorro-antd/message';
-import { FormBuilder, FormGroup } from '@angular/forms';
+import { FormControl, FormGroup } from '@angular/forms';
+import { NgComponentOutlet } from '@angular/common';
 import { FormBuilderStateService } from '../../services/form-builder.state.service';
-import { FieldType } from '../../../../core/models/schema.model';
+import { FieldSchema, FieldType } from '../../../../core/models/schema.model';
 import { FieldRegistryService } from '../../../../shared/dynamic-form/services/field-registry.service';
 
 interface FieldTypeItem {
@@ -21,7 +21,7 @@ interface FieldTypeItem {
 @Component({
   selector: 'app-canvas',
   imports: [
-    CommonModule, 
+    NgComponentOutlet,
     DragDropModule, 
     NzGridModule,
     NzButtonModule,
@@ -29,6 +29,7 @@ interface FieldTypeItem {
     NzTooltipModule,
     NzPopconfirmModule
   ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="p-6 bg-gray-100 h-full overflow-y-auto" (click)="onCanvasClick()">
       <div class="bg-white p-8 rounded-lg shadow-md min-h-[500px]">
@@ -39,12 +40,12 @@ interface FieldTypeItem {
           nz-row [nzGutter]="[16, 16]"
           id="canvasList"
           class="min-h-[300px] border-2 border-dashed border-gray-300 p-4 rounded transition-colors"
-          [class.bg-blue-50]="isDragging"
+          [class.bg-blue-50]="isDragging()"
           cdkDropList 
           [cdkDropListData]="state.schema().fields"
           (cdkDropListDropped)="onDrop($event)"
-          (cdkDropListEntered)="isDragging = true"
-          (cdkDropListExited)="isDragging = false"
+          (cdkDropListEntered)="isDragging.set(true)"
+          (cdkDropListExited)="isDragging.set(false)"
         >
           @if (!state.schema().fields.length) {
             <div class="text-center text-gray-400 py-20 pointer-events-none w-full">
@@ -57,7 +58,11 @@ interface FieldTypeItem {
             <div 
               nz-col [nzSpan]="field.gridSpan || 24"
               class="p-4 border rounded-lg shadow-sm bg-white cursor-pointer hover:shadow-md transition-all relative group"
-              [ngClass]="state.activeFieldId() === field.id ? 'border-blue-500 ring-2 ring-blue-100' : 'border-gray-200 hover:border-blue-400'"
+              [class.border-blue-500]="state.activeFieldId() === field.id"
+              [class.ring-2]="state.activeFieldId() === field.id"
+              [class.ring-blue-100]="state.activeFieldId() === field.id"
+              [class.border-gray-200]="state.activeFieldId() !== field.id"
+              [class.hover:border-blue-400]="state.activeFieldId() !== field.id"
               (click)="onFieldClick($event, field.id)"
               cdkDrag
             >
@@ -74,9 +79,10 @@ interface FieldTypeItem {
               <div class="flex justify-between items-center mb-3 pb-2 border-b border-gray-100">
                 <div class="flex items-center gap-2 overflow-hidden mr-2">
                   <label class="font-semibold text-gray-800 truncate select-none cursor-pointer">
+                    <!-- {{ field.label }}
                     @if (field.required) {
                       <span class="text-red-500 font-bold ml-0.5">*</span>
-                    }
+                    } -->
                   </label>
                   <span class="text-xs font-mono text-gray-500 bg-gray-100 px-2 py-0.5 rounded border border-gray-200 flex-shrink-0">{{ field.type }}</span>
                   <span class="text-xs font-mono text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200 flex-shrink-0" [title]="'Key: ' + (field.key || field.id)">
@@ -214,15 +220,14 @@ interface FieldTypeItem {
   `
 })
 export class CanvasComponent {
-  state = inject(FormBuilderStateService);
-  registry = inject(FieldRegistryService);
-  fb = inject(FormBuilder);
-  messageService = inject(NzMessageService);
+  readonly state = inject(FormBuilderStateService);
+  readonly registry = inject(FieldRegistryService);
+  readonly messageService = inject(NzMessageService);
   
-  isDragging = false;
-  dummyFormGroup: FormGroup = this.fb.group({});
+  readonly isDragging = signal(false);
+  readonly dummyFormGroup = new FormGroup({});
 
-  fieldTypes: FieldTypeItem[] = [
+  readonly fieldTypes: readonly FieldTypeItem[] = [
     { type: FieldType.TEXT_INPUT, label: 'TEXT_INPUT', icon: '📝' },
     { type: FieldType.TEXT_AREA, label: 'TEXT_AREA', icon: '📄' },
     { type: FieldType.NUMBER, label: 'NUMBER', icon: '🔢' },
@@ -235,17 +240,31 @@ export class CanvasComponent {
   constructor() {
     effect(() => {
       const fields = this.state.schema().fields;
-      const group: any = {};
+      const currentKeys = new Set(fields.map(f => f.key || f.id));
+
+      // Remove controls that no longer exist
+      Object.keys(this.dummyFormGroup.controls).forEach(key => {
+        if (!currentKeys.has(key)) {
+          this.dummyFormGroup.removeControl(key, { emitEvent: false });
+        }
+      });
+
+      // Add missing controls
       fields.forEach(field => {
         const controlKey = field.key || field.id;
-        group[controlKey] = [{ value: field.defaultValue || '', disabled: true }];
+        if (!this.dummyFormGroup.contains(controlKey)) {
+          this.dummyFormGroup.addControl(
+            controlKey,
+            new FormControl({ value: field.defaultValue ?? '', disabled: true }),
+            { emitEvent: false }
+          );
+        }
       });
-      this.dummyFormGroup = this.fb.group(group);
     });
   }
 
-  onDrop(event: CdkDragDrop<any>): void {
-    this.isDragging = false;
+  onDrop(event: CdkDragDrop<FieldSchema[], unknown, FieldType>): void {
+    this.isDragging.set(false);
     if (event.previousContainer === event.container) {
       this.state.moveField(event.previousIndex, event.currentIndex);
     } else {
@@ -293,4 +312,3 @@ export class CanvasComponent {
     this.messageService.success('Đã thêm trường phía sau');
   }
 }
-

@@ -1,5 +1,4 @@
 import { Component, input, ChangeDetectionStrategy } from '@angular/core';
-import { CommonModule } from '@angular/common';
 import { FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { NzInputNumberModule } from 'ng-zorro-antd/input-number';
 import { NzFormModule } from 'ng-zorro-antd/form';
@@ -7,7 +6,7 @@ import { NumberFieldSchema } from '../../../../core/models/schema.model';
 
 @Component({
   selector: 'app-number-field',
-  imports: [CommonModule, ReactiveFormsModule, NzInputNumberModule, NzFormModule],
+  imports: [ReactiveFormsModule, NzInputNumberModule, NzFormModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <nz-form-item [formGroup]="formGroup()">

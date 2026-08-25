@@ -1,8 +1,8 @@
 import { FieldType } from './field-type.enum';
 
-export interface FieldOption {
+export interface FieldOption<T = unknown> {
   label: string;
-  value: any;
+  value: T;
 }
 
 export interface FieldValidation {
@@ -19,7 +19,7 @@ export interface BaseFieldSchema {
   type: FieldType;        // Loại field
   label: string;          // Tên field hiển thị
   required?: boolean;
-  defaultValue?: any;
+  defaultValue?: unknown;
   gridSpan?: number;      // Dành cho hệ thống grid (1-24 của ng-zorro)
   validations?: FieldValidation; // Các rule validate nâng cao
 }

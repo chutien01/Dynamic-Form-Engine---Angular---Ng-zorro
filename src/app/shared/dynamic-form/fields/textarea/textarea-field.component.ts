@@ -1,5 +1,4 @@
 import { Component, input, ChangeDetectionStrategy } from '@angular/core';
-import { CommonModule } from '@angular/common';
 import { FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { NzInputModule } from 'ng-zorro-antd/input';
 import { NzFormModule } from 'ng-zorro-antd/form';
@@ -7,7 +6,7 @@ import { TextareaFieldSchema } from '../../../../core/models/schema.model';
 
 @Component({
   selector: 'app-textarea-field',
-  imports: [CommonModule, ReactiveFormsModule, NzInputModule, NzFormModule],
+  imports: [ReactiveFormsModule, NzInputModule, NzFormModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <nz-form-item [formGroup]="formGroup()">

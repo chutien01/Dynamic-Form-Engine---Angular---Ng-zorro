@@ -1,5 +1,4 @@
-import { Component } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, ChangeDetectionStrategy } from '@angular/core';
 import { DragDropModule } from '@angular/cdk/drag-drop';
 import { FieldType } from '../../../../core/models/schema/field-type.enum';
 
@@ -11,7 +10,8 @@ interface ToolboxItem {
 
 @Component({
   selector: 'app-toolbox',
-  imports: [CommonModule, DragDropModule],
+  imports: [DragDropModule],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="p-4 bg-white border-r border-gray-200 h-full overflow-y-auto shadow-sm">
       <h3 class="font-bold text-lg mb-4 text-gray-800 border-b pb-2">Toolbox</h3>
@@ -40,7 +40,7 @@ interface ToolboxItem {
   `
 })
 export class ToolboxComponent {
-  items: ToolboxItem[] = [
+  readonly items: readonly ToolboxItem[] = [
     { type: FieldType.TEXT_INPUT, label: 'TEXT_INPUT', icon: '📝' },
     { type: FieldType.TEXT_AREA, label: 'TEXT_AREA', icon: '📄' },
     { type: FieldType.NUMBER, label: 'NUMBER', icon: '🔢' },

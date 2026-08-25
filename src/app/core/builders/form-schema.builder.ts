@@ -43,6 +43,6 @@ export class FormSchemaBuilder {
 
   build(): FormSchema {
     // Return a deep copy to prevent external mutation
-    return JSON.parse(JSON.stringify(this.formSchema));
+    return structuredClone(this.formSchema);
   }
 }

@@ -9,36 +9,34 @@ import { FieldBuilderFactory } from '../../../core/builders/field.builder';
   providedIn: 'root'
 })
 export class FormBuilderStateService {
-  private schemaBuilder = new FormSchemaBuilder('Untitled Form')
-    .setDescription('Kéo thả các trường từ Toolbox vào đây để thiết kế form.');
-
   // State Signals
-  readonly schema = signal<FormSchema>(this.schemaBuilder.build());
+  readonly schema = signal<FormSchema>(
+    new FormSchemaBuilder('Untitled Form')
+      .setDescription('Kéo thả các trường từ Toolbox vào đây để thiết kế form.')
+      .build()
+  );
   readonly activeFieldId = signal<string | null>(null);
 
   // Computed signal for the currently selected field
   readonly activeField = computed(() => {
     const id = this.activeFieldId();
-    if (id) {
-      const field = this.schema().fields.find(f => f.id === id);
-      return field ? { ...field } : null;
-    }
-    return null;
+    if (!id) return null;
+    return this.schema().fields.find(f => f.id === id) ?? null;
   });
 
-  private updateSchema() {
-    this.schema.set(this.schemaBuilder.build());
-  }
-
-  setActiveField(fieldId: string | null) {
+  setActiveField(fieldId: string | null): void {
     this.activeFieldId.set(fieldId);
   }
 
-  updateActiveField(updatedData: Partial<FieldSchema>) {
+  updateActiveField(updatedData: Partial<FieldSchema>): void {
     const currentId = this.activeFieldId();
     if (currentId) {
-      this.schemaBuilder.updateField(currentId, updatedData);
-      this.updateSchema();
+      this.schema.update(currentSchema => ({
+        ...currentSchema,
+        fields: currentSchema.fields.map(field =>
+          field.id === currentId ? ({ ...field, ...updatedData } as FieldSchema) : field
+        )
+      }));
     }
   }
 
@@ -56,41 +54,49 @@ export class FormBuilderStateService {
     const newField = FieldBuilderFactory.create(fieldType)
       .setLabel(defaultLabelMap[fieldType] || `New ${fieldType} field`)
       .build();
-    
-    const currentFields = [...this.schema().fields];
-    currentFields.splice(index, 0, newField);
-    
-    this.rebuildSchemaFromFields(currentFields);
+
+    this.schema.update(current => {
+      const nextFields = [...current.fields];
+      nextFields.splice(index, 0, newField);
+      return { ...current, fields: nextFields };
+    });
+
     this.setActiveField(newField.id);
     return newField.id;
   }
 
   duplicateField(fieldId: string): string | null {
-    const currentFields = [...this.schema().fields];
-    const index = currentFields.findIndex(f => f.id === fieldId);
+    const current = this.schema();
+    const index = current.fields.findIndex(f => f.id === fieldId);
     if (index === -1) return null;
 
-    const sourceField = currentFields[index];
+    const sourceField = current.fields[index];
     const clonedId = uuidv4();
     const clonedField: FieldSchema = {
-      ...JSON.parse(JSON.stringify(sourceField)),
+      ...structuredClone(sourceField),
       id: clonedId,
       key: `${sourceField.key || sourceField.id}_copy`,
       label: `${sourceField.label} (Copy)`
     };
 
-    currentFields.splice(index + 1, 0, clonedField);
-    this.rebuildSchemaFromFields(currentFields);
+    this.schema.update(schema => {
+      const nextFields = [...schema.fields];
+      nextFields.splice(index + 1, 0, clonedField);
+      return { ...schema, fields: nextFields };
+    });
+
     this.setActiveField(clonedField.id);
     return clonedField.id;
   }
 
   deleteField(fieldId: string): void {
-    const currentFields = this.schema().fields.filter(f => f.id !== fieldId);
     if (this.activeFieldId() === fieldId) {
       this.setActiveField(null);
     }
-    this.rebuildSchemaFromFields(currentFields);
+    this.schema.update(schema => ({
+      ...schema,
+      fields: schema.fields.filter(f => f.id !== fieldId)
+    }));
   }
 
   addFieldBefore(relativeFieldId: string, fieldType: FieldType): string | null {
@@ -105,32 +111,22 @@ export class FormBuilderStateService {
     return this.addField(fieldType, index + 1);
   }
 
-  moveField(previousIndex: number, currentIndex: number) {
-    const currentFields = [...this.schema().fields];
-    moveItemInArray(currentFields, previousIndex, currentIndex);
-    this.rebuildSchemaFromFields(currentFields);
+  moveField(previousIndex: number, currentIndex: number): void {
+    this.schema.update(schema => {
+      const nextFields = [...schema.fields];
+      moveItemInArray(nextFields, previousIndex, currentIndex);
+      return { ...schema, fields: nextFields };
+    });
   }
 
-  private rebuildSchemaFromFields(fields: FieldSchema[]) {
-    this.schemaBuilder = new FormSchemaBuilder(this.schema().title)
-      .setDescription(this.schema().description || '')
-      .setLayout(this.schema().layout || 'vertical');
-      
-    fields.forEach(f => this.schemaBuilder.addField(f));
-    this.updateSchema();
-  }
-
-  loadSchema(schema: FormSchema) {
-    this.schemaBuilder = new FormSchemaBuilder(schema.title || 'Untitled Form')
-      .setDescription(schema.description || '')
-      .setLayout(schema.layout || 'vertical');
-      
-    if (schema.fields && Array.isArray(schema.fields)) {
-      schema.fields.forEach(f => this.schemaBuilder.addField(f));
-    }
-    
-    this.updateSchema();
+  loadSchema(schema: FormSchema): void {
+    this.schema.set({
+      formId: schema.formId || uuidv4(),
+      title: schema.title || 'Untitled Form',
+      description: schema.description || '',
+      layout: schema.layout || 'vertical',
+      fields: Array.isArray(schema.fields) ? structuredClone(schema.fields) : []
+    });
     this.setActiveField(null);
   }
 }
-

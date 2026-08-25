@@ -1,5 +1,4 @@
 import { Component, input, ChangeDetectionStrategy } from '@angular/core';
-import { CommonModule } from '@angular/common';
 import { FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { NzRadioModule } from 'ng-zorro-antd/radio';
 import { NzFormModule } from 'ng-zorro-antd/form';
@@ -7,7 +6,7 @@ import { RadioFieldSchema } from '../../../../core/models/schema.model';
 
 @Component({
   selector: 'app-radio-field',
-  imports: [CommonModule, ReactiveFormsModule, NzRadioModule, NzFormModule],
+  imports: [ReactiveFormsModule, NzRadioModule, NzFormModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <nz-form-item [formGroup]="formGroup()">
