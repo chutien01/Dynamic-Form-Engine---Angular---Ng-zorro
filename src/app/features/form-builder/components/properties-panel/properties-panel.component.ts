@@ -1,6 +1,6 @@
-import { Component, computed, effect, inject } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { FormArray, FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
+import { Component, computed, effect, inject, ChangeDetectionStrategy } from '@angular/core';
+import { FormArray, FormBuilder, FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NzFormModule } from 'ng-zorro-antd/form';
 import { NzInputModule } from 'ng-zorro-antd/input';
 import { NzSwitchModule } from 'ng-zorro-antd/switch';
@@ -9,12 +9,20 @@ import { NzButtonModule } from 'ng-zorro-antd/button';
 import { NzPopconfirmModule } from 'ng-zorro-antd/popconfirm';
 import { NzMessageService } from 'ng-zorro-antd/message';
 import { FormBuilderStateService } from '../../services/form-builder.state.service';
-import { FieldSchema, FieldType } from '../../../../core/models/schema.model';
+import { FieldType, FieldOption } from '../../../../core/models/schema.model';
+
+interface PropertyFormValue {
+  key: string;
+  label: string;
+  placeholder?: string;
+  required: boolean;
+  gridSpan: number;
+  options: FieldOption[];
+}
 
 @Component({
   selector: 'app-properties-panel',
   imports: [
-    CommonModule, 
     ReactiveFormsModule, 
     NzFormModule, 
     NzInputModule, 
@@ -23,6 +31,7 @@ import { FieldSchema, FieldType } from '../../../../core/models/schema.model';
     NzButtonModule,
     NzPopconfirmModule
   ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="p-4 bg-white border-l border-gray-200 h-full overflow-y-auto shadow-sm flex flex-col justify-between" (click)="$event.stopPropagation()">
       <div>
@@ -39,7 +48,6 @@ import { FieldSchema, FieldType } from '../../../../core/models/schema.model';
           <form nz-form [nzLayout]="'vertical'" [formGroup]="formGroup">
             <div class="mb-4 p-2 bg-blue-50 text-blue-800 text-xs rounded font-mono break-all border border-blue-100 flex justify-between items-center">
               <div>
-                <!-- ID: {{ currentField.id }} -->
                 Type: {{ currentField.type }}
                 <br/>Key: {{ currentField.key || currentField.id }}
               </div>
@@ -142,88 +150,89 @@ import { FieldSchema, FieldType } from '../../../../core/models/schema.model';
   `
 })
 export class PropertiesPanelComponent {
-  state = inject(FormBuilderStateService);
-  messageService = inject(NzMessageService);
-  formGroup: FormGroup;
+  readonly state = inject(FormBuilderStateService);
+  readonly messageService = inject(NzMessageService);
+  private readonly fb = inject(FormBuilder);
 
-  hasPlaceholder = computed(() => {
+  private readonly placeholderTypes = new Set<string>([
+    FieldType.TEXT_INPUT,
+    FieldType.TEXT_AREA,
+    FieldType.NUMBER,
+    FieldType.SELECT,
+    FieldType.TEXT,
+    FieldType.TEXTAREA,
+    'text',
+    'textarea',
+    'number',
+    'select'
+  ]);
+
+  private readonly optionTypes = new Set<string>([
+    FieldType.SELECT,
+    FieldType.RADIO_GROUP,
+    FieldType.CHECKBOX,
+    FieldType.RADIO,
+    'select',
+    'radio',
+    'checkbox'
+  ]);
+
+  readonly hasPlaceholder = computed(() => {
     const currentField = this.state.activeField();
-    return currentField ? [
-      FieldType.TEXT_INPUT,
-      FieldType.TEXT_AREA,
-      FieldType.NUMBER,
-      FieldType.SELECT,
-      'text',
-      'textarea',
-      'number',
-      'select'
-    ].includes(currentField.type) : false;
+    return currentField ? this.placeholderTypes.has(currentField.type) : false;
   });
 
-  hasOptions = computed(() => {
+  readonly hasOptions = computed(() => {
     const currentField = this.state.activeField();
-    return currentField ? [
-      FieldType.SELECT,
-      FieldType.RADIO_GROUP,
-      FieldType.CHECKBOX,
-      'select',
-      'radio',
-      'checkbox'
-    ].includes(currentField.type) : false;
+    return currentField ? this.optionTypes.has(currentField.type) : false;
   });
 
-  private fb = inject(FormBuilder);
+  readonly formGroup = this.fb.group({
+    key: this.fb.nonNullable.control(''),
+    label: this.fb.nonNullable.control(''),
+    placeholder: this.fb.nonNullable.control(''),
+    required: this.fb.nonNullable.control(false),
+    gridSpan: this.fb.nonNullable.control(24),
+    options: this.fb.array<FormGroup<{ label: FormControl<string>; value: FormControl<unknown> }>>([])
+  });
+
   private lastFieldId: string | null = null;
 
   constructor() {
-    this.formGroup = this.fb.group({
-      key: [''],
-      label: [''],
-      placeholder: [''],
-      required: [false],
-      gridSpan: [24],
-      options: this.fb.array([])
-    });
+    this.formGroup.valueChanges
+      .pipe(takeUntilDestroyed())
+      .subscribe(value => {
+        if (this.state.activeFieldId()) {
+          this.state.updateActiveField(value as Partial<PropertyFormValue>);
+        }
+      });
 
-    this.formGroup.valueChanges.subscribe(value => {
-      if (this.state.activeField()) {
-        this.state.updateActiveField(value);
-      }
-    });
-
-    // Effect to patch values when signal input changes
     effect(() => {
       const currentField = this.state.activeField();
       if (currentField && currentField.id !== this.lastFieldId) {
         this.lastFieldId = currentField.id;
         
+        const placeholder = ('placeholder' in currentField && typeof currentField.placeholder === 'string') 
+          ? currentField.placeholder 
+          : '';
+
         this.formGroup.patchValue({
           key: currentField.key || currentField.id,
           label: currentField.label || '',
-          placeholder: 'placeholder' in currentField ? (currentField as any).placeholder : '',
+          placeholder,
           required: !!currentField.required,
           gridSpan: currentField.gridSpan || 24
         }, { emitEvent: false });
 
-        const supportsOptions = [
-          FieldType.SELECT,
-          FieldType.RADIO_GROUP,
-          FieldType.CHECKBOX,
-          'select',
-          'radio',
-          'checkbox'
-        ].includes(currentField.type);
-        if (supportsOptions) {
+        if (this.optionTypes.has(currentField.type)) {
           this.optionsArray.clear({ emitEvent: false });
-          const options = (currentField as any).options;
-          if (options && Array.isArray(options)) {
-            options.forEach((opt: any) => {
-              this.optionsArray.push(this.fb.group({
-                label: [opt.label],
-                value: [opt.value]
-              }), { emitEvent: false });
-            });
-          }
+          const options = ('options' in currentField && Array.isArray(currentField.options))
+            ? currentField.options
+            : [];
+          
+          options.forEach(opt => {
+            this.optionsArray.push(this.createOptionGroup(opt.label, opt.value), { emitEvent: false });
+          });
         } else {
           this.optionsArray.clear({ emitEvent: false });
         }
@@ -233,23 +242,27 @@ export class PropertiesPanelComponent {
     });
   }
 
-  get optionsArray(): FormArray {
-    return this.formGroup.get('options') as FormArray;
+  get optionsArray() {
+    return this.formGroup.controls.options;
   }
 
-  addOption() {
+  private createOptionGroup(label: string, value: unknown) {
+    return this.fb.group({
+      label: this.fb.nonNullable.control(label),
+      value: this.fb.nonNullable.control(value)
+    });
+  }
+
+  addOption(): void {
     const index = this.optionsArray.length + 1;
-    this.optionsArray.push(this.fb.group({
-      label: [`Option ${index}`],
-      value: [`option_${index}`]
-    }));
+    this.optionsArray.push(this.createOptionGroup(`Option ${index}`, `option_${index}`));
   }
 
-  removeOption(index: number) {
+  removeOption(index: number): void {
     this.optionsArray.removeAt(index);
   }
 
-  duplicateCurrentField() {
+  duplicateCurrentField(): void {
     const activeId = this.state.activeFieldId();
     if (activeId) {
       this.state.duplicateField(activeId);
@@ -257,7 +270,7 @@ export class PropertiesPanelComponent {
     }
   }
 
-  deleteCurrentField() {
+  deleteCurrentField(): void {
     const activeId = this.state.activeFieldId();
     if (activeId) {
       this.state.deleteField(activeId);
@@ -265,4 +278,3 @@ export class PropertiesPanelComponent {
     }
   }
 }
-

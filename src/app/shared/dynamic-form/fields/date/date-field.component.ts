@@ -1,5 +1,4 @@
 import { Component, input, ChangeDetectionStrategy } from '@angular/core';
-import { CommonModule } from '@angular/common';
 import { FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { NzDatePickerModule } from 'ng-zorro-antd/date-picker';
 import { NzFormModule } from 'ng-zorro-antd/form';
@@ -7,7 +6,7 @@ import { DateFieldSchema } from '../../../../core/models/schema.model';
 
 @Component({
   selector: 'app-date-field',
-  imports: [CommonModule, ReactiveFormsModule, NzDatePickerModule, NzFormModule],
+  imports: [ReactiveFormsModule, NzDatePickerModule, NzFormModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <nz-form-item [formGroup]="formGroup()">

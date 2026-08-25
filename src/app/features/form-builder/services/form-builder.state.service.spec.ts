@@ -70,4 +70,52 @@ describe('FormBuilderStateService Actions', () => {
     expect(service.schema().fields[2].id).toBe(id2);
     expect(service.activeFieldId()).toBe(afterId);
   });
+
+  it('should move field position in array', () => {
+    const id1 = service.addField(FieldType.TEXT_INPUT, 0);
+    const id2 = service.addField(FieldType.NUMBER, 1);
+    const id3 = service.addField(FieldType.SELECT, 2);
+
+    expect(service.schema().fields.map(f => f.id)).toEqual([id1, id2, id3]);
+
+    service.moveField(0, 2);
+    expect(service.schema().fields.map(f => f.id)).toEqual([id2, id3, id1]);
+  });
+
+  it('should load new schema correctly and reset activeField', () => {
+    service.addField(FieldType.TEXT_INPUT, 0);
+    expect(service.activeFieldId()).not.toBeNull();
+
+    service.loadSchema({
+      formId: 'custom-form-123',
+      title: 'Imported Form',
+      description: 'Loaded from JSON',
+      layout: 'horizontal',
+      fields: [
+        {
+          id: 'f1',
+          key: 'username',
+          type: FieldType.TEXT_INPUT,
+          label: 'User Name'
+        }
+      ]
+    });
+
+    expect(service.schema().formId).toBe('custom-form-123');
+    expect(service.schema().title).toBe('Imported Form');
+    expect(service.schema().fields.length).toBe(1);
+    expect(service.schema().fields[0].key).toBe('username');
+    expect(service.activeFieldId()).toBeNull();
+    expect(service.activeField()).toBeNull();
+  });
+
+  it('should reactively compute activeField when field properties are updated', () => {
+    const id = service.addField(FieldType.TEXT_INPUT, 0);
+    expect(service.activeField()?.label).toBe('TEXT_INPUT');
+
+    service.updateActiveField({ label: 'Full Name', placeholder: 'Enter name' });
+    expect(service.activeField()?.label).toBe('Full Name');
+    expect((service.activeField() as any)?.placeholder).toBe('Enter name');
+  });
 });
+

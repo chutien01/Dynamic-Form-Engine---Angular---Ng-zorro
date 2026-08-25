@@ -1,10 +1,10 @@
-import { Component, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, signal, ChangeDetectionStrategy } from '@angular/core';
 import { DynamicFormBuilderComponent } from './features/form-builder/dynamic-form-builder.component';
 
 @Component({
   selector: 'app-root',
-  imports: [CommonModule, DynamicFormBuilderComponent],
+  imports: [DynamicFormBuilderComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })
