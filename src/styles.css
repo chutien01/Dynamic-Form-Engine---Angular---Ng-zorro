@@ -1,0 +1,7 @@
+@import 'jsoneditor/dist/jsoneditor.min.css';
+@import "ng-zorro-antd/ng-zorro-antd.min.css";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+json-editor, json-editor > div, .jsoneditor { height: 100% !important; }

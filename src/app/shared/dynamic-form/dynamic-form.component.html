@@ -1,0 +1,19 @@
+<form nz-form [formGroup]="formGroup" [nzLayout]="schema().layout" (ngSubmit)="onSubmit()">
+  <div nz-row [nzGutter]="16">
+    @for (field of schema().fields; track field.id) {
+      <div nz-col [nzSpan]="field.gridSpan || 24">
+        <ng-container *ngComponentOutlet="
+            getComponentForType(field.type); 
+            inputs: { field: field, formGroup: formGroup }
+        "></ng-container>
+
+      </div>
+    }
+  </div>
+  
+  <nz-form-item>
+    <nz-form-control>
+      <button nz-button nzType="primary" type="submit">Submit</button>
+    </nz-form-control>
+  </nz-form-item>
+</form>

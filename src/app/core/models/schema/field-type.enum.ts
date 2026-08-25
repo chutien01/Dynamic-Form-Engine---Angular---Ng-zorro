@@ -1,0 +1,16 @@
+export enum FieldType {
+  TEXT_INPUT = 'INPUT',
+  TEXT_AREA = 'TEXTAREA',
+  NUMBER = 'INPUT_NUMBER',
+  SELECT = 'SELECT',
+  RADIO_GROUP = 'RADIO_GROUP',
+  CHECKBOX = 'CHECKBOX',
+  DATE_PICKER = 'DATE_PICKER',
+
+  // Backward compatibility aliases
+  TEXT = 'TEXT_INPUT',
+  TEXTAREA = 'TEXT_AREA',
+  RADIO = 'RADIO_GROUP',
+  DATE = 'DATE_PICKER'
+}
+
