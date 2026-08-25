@@ -6,6 +6,17 @@ export enum FieldType {
   RADIO_GROUP = 'RADIO_GROUP',
   CHECKBOX = 'CHECKBOX',
   DATE_PICKER = 'DATE_PICKER',
+  SWITCH = 'SWITCH',
+  DATE_RANGE = 'DATE_RANGE',
+  RATE = 'RATE',
+  SLIDER = 'SLIDER',
+  FILE_UPLOAD = 'FILE_UPLOAD',
+
+  // Layout Containers
+  CARD = 'CARD',
+  TABS = 'TABS',
+  COLLAPSE = 'COLLAPSE',
+  STEPS = 'STEPS',
 
   // Backward compatibility aliases
   TEXT = 'TEXT_INPUT',
@@ -13,4 +24,3 @@ export enum FieldType {
   RADIO = 'RADIO_GROUP',
   DATE = 'DATE_PICKER'
 }
-

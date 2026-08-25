@@ -4,6 +4,15 @@ import { v4 as uuidv4 } from 'uuid';
 import { FormSchema, FieldSchema, FieldType } from '../../../core/models/schema.model';
 import { FormSchemaBuilder } from '../../../core/builders/form-schema.builder';
 import { FieldBuilderFactory } from '../../../core/builders/field.builder';
+import { 
+  findFieldById, 
+  updateFieldRecursive, 
+  deleteFieldRecursive, 
+  addChildFieldToContainer,
+  moveChildFieldInContainer,
+  duplicateFieldRecursive,
+  insertFieldRelativeToTargetRecursive
+} from '../../../core/utils/schema.utils';
 
 @Injectable({
   providedIn: 'root'
@@ -16,16 +25,46 @@ export class FormBuilderStateService {
       .build()
   );
   readonly activeFieldId = signal<string | null>(null);
+  readonly isConfigModalOpen = signal<boolean>(false);
 
-  // Computed signal for the currently selected field
+  // Computed signal for the currently selected field (searches recursively)
   readonly activeField = computed(() => {
     const id = this.activeFieldId();
     if (!id) return null;
-    return this.schema().fields.find(f => f.id === id) ?? null;
+    return findFieldById(this.schema().fields, id);
+  });
+
+  // Computed list of dropzone IDs (for CDK Drag and Drop connections)
+  readonly connectedDropLists = computed(() => {
+    const ids = ['canvasList'];
+    for (const field of this.schema().fields) {
+      if (field.type === FieldType.CARD) {
+        ids.push(`container_${field.id}`);
+      } else if (
+        (field.type === FieldType.TABS || field.type === FieldType.COLLAPSE || field.type === FieldType.STEPS) &&
+        'items' in field && Array.isArray(field.items)
+      ) {
+        for (const item of field.items) {
+          ids.push(`container_${item.id}`);
+        }
+      }
+    }
+    return ids;
   });
 
   setActiveField(fieldId: string | null): void {
     this.activeFieldId.set(fieldId);
+  }
+
+  openConfigModal(fieldId?: string): void {
+    if (fieldId) {
+      this.setActiveField(fieldId);
+    }
+    this.isConfigModalOpen.set(true);
+  }
+
+  closeConfigModal(): void {
+    this.isConfigModalOpen.set(false);
   }
 
   updateActiveField(updatedData: Partial<FieldSchema>): void {
@@ -33,26 +72,36 @@ export class FormBuilderStateService {
     if (currentId) {
       this.schema.update(currentSchema => ({
         ...currentSchema,
-        fields: currentSchema.fields.map(field =>
-          field.id === currentId ? ({ ...field, ...updatedData } as FieldSchema) : field
-        )
+        fields: updateFieldRecursive(currentSchema.fields, currentId, updatedData)
       }));
     }
   }
 
-  addField(fieldType: FieldType, index: number): string {
+  private getDefaultLabel(fieldType: FieldType): string {
     const defaultLabelMap: Partial<Record<FieldType, string>> = {
-      [FieldType.TEXT_INPUT]: 'TEXT_INPUT',
-      [FieldType.TEXT_AREA]: 'TEXT_AREA',
-      [FieldType.NUMBER]: 'NUMBER',
-      [FieldType.SELECT]: 'SELECT',
-      [FieldType.RADIO_GROUP]: 'RADIO_GROUP',
-      [FieldType.CHECKBOX]: 'CHECKBOX',
-      [FieldType.DATE_PICKER]: 'DATE_PICKER'
+      [FieldType.TEXT_INPUT]: 'Text Input',
+      [FieldType.TEXT_AREA]: 'Textarea',
+      [FieldType.NUMBER]: 'Number',
+      [FieldType.SELECT]: 'Select Dropdown',
+      [FieldType.RADIO_GROUP]: 'Radio Group',
+      [FieldType.CHECKBOX]: 'Checkbox',
+      [FieldType.DATE_PICKER]: 'Date Picker',
+      [FieldType.SWITCH]: 'Switch',
+      [FieldType.DATE_RANGE]: 'Date Range',
+      [FieldType.RATE]: 'Rating',
+      [FieldType.SLIDER]: 'Slider',
+      [FieldType.FILE_UPLOAD]: 'File Upload',
+      [FieldType.CARD]: 'Card Section',
+      [FieldType.TABS]: 'Tabs Container',
+      [FieldType.COLLAPSE]: 'Accordion / Collapse',
+      [FieldType.STEPS]: 'Step Wizard'
     };
+    return defaultLabelMap[fieldType] || `New ${fieldType} field`;
+  }
 
+  addField(fieldType: FieldType, index: number, autoOpenModal = true): string {
     const newField = FieldBuilderFactory.create(fieldType)
-      .setLabel(defaultLabelMap[fieldType] || `New ${fieldType} field`)
+      .setLabel(this.getDefaultLabel(fieldType))
       .build();
 
     this.schema.update(current => {
@@ -62,53 +111,87 @@ export class FormBuilderStateService {
     });
 
     this.setActiveField(newField.id);
+    if (autoOpenModal) {
+      this.openConfigModal(newField.id);
+    }
     return newField.id;
   }
 
+  addChildField(containerId: string, itemId: string | null, fieldType: FieldType, targetIndex?: number, autoOpenModal = true): string {
+    const newField = FieldBuilderFactory.create(fieldType)
+      .setLabel(this.getDefaultLabel(fieldType))
+      .build();
+
+    this.schema.update(current => ({
+      ...current,
+      fields: addChildFieldToContainer(current.fields, containerId, itemId, newField, targetIndex)
+    }));
+
+    this.setActiveField(newField.id);
+    if (autoOpenModal) {
+      this.openConfigModal(newField.id);
+    }
+    return newField.id;
+  }
+
+  moveChildField(containerId: string, itemId: string | null, previousIndex: number, currentIndex: number): void {
+    this.schema.update(current => ({
+      ...current,
+      fields: moveChildFieldInContainer(current.fields, containerId, itemId, previousIndex, currentIndex)
+    }));
+  }
+
   duplicateField(fieldId: string): string | null {
-    const current = this.schema();
-    const index = current.fields.findIndex(f => f.id === fieldId);
-    if (index === -1) return null;
-
-    const sourceField = current.fields[index];
-    const clonedId = uuidv4();
-    const clonedField: FieldSchema = {
-      ...structuredClone(sourceField),
-      id: clonedId,
-      key: `${sourceField.key || sourceField.id}_copy`,
-      label: `${sourceField.label} (Copy)`
-    };
-
+    let newId: string | null = null;
     this.schema.update(schema => {
-      const nextFields = [...schema.fields];
-      nextFields.splice(index + 1, 0, clonedField);
-      return { ...schema, fields: nextFields };
+      const result = duplicateFieldRecursive(schema.fields, fieldId);
+      newId = result.clonedId;
+      return { ...schema, fields: result.updatedFields };
     });
 
-    this.setActiveField(clonedField.id);
-    return clonedField.id;
+    if (newId) {
+      this.setActiveField(newId);
+    }
+    return newId;
   }
 
   deleteField(fieldId: string): void {
     if (this.activeFieldId() === fieldId) {
       this.setActiveField(null);
+      this.closeConfigModal();
     }
     this.schema.update(schema => ({
       ...schema,
-      fields: schema.fields.filter(f => f.id !== fieldId)
+      fields: deleteFieldRecursive(schema.fields, fieldId)
     }));
   }
 
   addFieldBefore(relativeFieldId: string, fieldType: FieldType): string | null {
-    const index = this.schema().fields.findIndex(f => f.id === relativeFieldId);
-    if (index === -1) return null;
-    return this.addField(fieldType, index);
+    const newField = FieldBuilderFactory.create(fieldType)
+      .setLabel(this.getDefaultLabel(fieldType))
+      .build();
+
+    this.schema.update(schema => ({
+      ...schema,
+      fields: insertFieldRelativeToTargetRecursive(schema.fields, relativeFieldId, newField, 'before')
+    }));
+
+    this.setActiveField(newField.id);
+    return newField.id;
   }
 
   addFieldAfter(relativeFieldId: string, fieldType: FieldType): string | null {
-    const index = this.schema().fields.findIndex(f => f.id === relativeFieldId);
-    if (index === -1) return null;
-    return this.addField(fieldType, index + 1);
+    const newField = FieldBuilderFactory.create(fieldType)
+      .setLabel(this.getDefaultLabel(fieldType))
+      .build();
+
+    this.schema.update(schema => ({
+      ...schema,
+      fields: insertFieldRelativeToTargetRecursive(schema.fields, relativeFieldId, newField, 'after')
+    }));
+
+    this.setActiveField(newField.id);
+    return newField.id;
   }
 
   moveField(previousIndex: number, currentIndex: number): void {
@@ -128,5 +211,6 @@ export class FormBuilderStateService {
       fields: Array.isArray(schema.fields) ? structuredClone(schema.fields) : []
     });
     this.setActiveField(null);
+    this.closeConfigModal();
   }
 }
