@@ -87,23 +87,6 @@
             [class.scale-100]="state.activeFieldId() === field.id"
             (click)="$event.stopPropagation()"
           >
-            <!-- Edit / Settings (Amber Accent) -->
-            <button 
-              type="button" 
-              nz-button 
-              nzType="text" 
-              nzSize="small" 
-              nz-tooltip 
-              nzTooltipTitle="Cài đặt trường (Settings)"
-              (click)="openSettings(field.id, $event)"
-              class="!flex !items-center !justify-center !w-6 !h-6 !p-0 !min-w-0 !rounded-full !bg-amber-50 hover:!bg-amber-100 !text-amber-600 transition-colors shadow-2xs"
-            >
-              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="3"></circle>
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-              </svg>
-            </button>
-
             <!-- Add Before (Blue Accent) -->
             <button 
               type="button" 
@@ -216,7 +199,7 @@
           </div>
 
           <!-- Dynamic Component Outlet -->
-          <div class="w-full">
+          <div class="w-full" [class.pointer-events-none]="!isContainerField(field.type)" [class.select-none]="!isContainerField(field.type)">
             <ng-container *ngComponentOutlet="
                 registry.getComponent(field.type); 
                 inputs: { field: field, formGroup: dummyFormGroup, isBuilder: true }

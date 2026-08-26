@@ -13,7 +13,7 @@ import { CheckboxFieldSchema } from '../../../../core/models/schema.model';
       @if (field().label) {
         <nz-form-label [nzRequired]="field().required" [nzFor]="field().key || field().id">{{ field().label }}</nz-form-label>
       }
-      <nz-form-control [nzErrorTip]="'Please check your ' + field().label">
+      <nz-form-control [nzErrorTip]="field().validations?.customMessage || ('Vui lòng chọn ' + (field().label || 'trường này'))">
         @if (field().options && field().options!.length > 0) {
           <div class="w-full flex gap-4 flex-wrap">
             @for (opt of field().options; track opt.value) {

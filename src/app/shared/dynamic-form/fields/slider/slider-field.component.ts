@@ -13,7 +13,7 @@ import { SliderFieldSchema } from '../../../../core/models/schema.model';
       @if (field().label) {
         <nz-form-label [nzRequired]="field().required" [nzFor]="field().key || field().id">{{ field().label }}</nz-form-label>
       }
-      <nz-form-control [nzErrorTip]="'Please check your ' + field().label">
+      <nz-form-control [nzErrorTip]="field().validations?.customMessage || ('Vui lòng điều chỉnh ' + (field().label || 'trường này'))">
         <nz-slider 
           [formControlName]="field().key || field().id" 
           [nzMin]="field().min ?? 0" 

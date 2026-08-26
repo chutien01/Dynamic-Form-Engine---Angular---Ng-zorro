@@ -13,7 +13,7 @@ import { RadioFieldSchema } from '../../../../core/models/schema.model';
       @if (field().label) {
         <nz-form-label [nzRequired]="field().required" [nzFor]="field().key || field().id">{{ field().label }}</nz-form-label>
       }
-      <nz-form-control [nzErrorTip]="'Please check your ' + field().label">
+      <nz-form-control [nzErrorTip]="field().validations?.customMessage || ('Vui lòng chọn ' + (field().label || 'trường này'))">
         <nz-radio-group [formControlName]="field().key || field().id" [id]="field().key || field().id">
           @for (option of field().options; track option.value) {
             <label nz-radio [nzValue]="option.value">{{ option.label }}</label>

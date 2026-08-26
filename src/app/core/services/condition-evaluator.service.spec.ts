@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ConditionEvaluatorService } from './condition-evaluator.service';
-import { FieldSchema, FieldType } from '../models/schema.model';
+import { FieldSchema, FieldType, FormSchema } from '../models/schema.model';
 
 describe('ConditionEvaluatorService', () => {
   let service: ConditionEvaluatorService;
@@ -110,6 +110,67 @@ describe('ConditionEvaluatorService', () => {
       expect(service.isFieldVisible(multiRuleField, { country: 'VN' })).toBe(true);
       expect(service.isFieldVisible(multiRuleField, { country: 'US' })).toBe(true);
       expect(service.isFieldVisible(multiRuleField, { country: 'JP' })).toBe(false);
+    });
+
+    it('should correctly evaluate boolean conditions (Checkbox/Switch true/false)', () => {
+      const card2: FieldSchema = {
+        id: 'card_2',
+        key: 'card_2',
+        type: FieldType.CARD,
+        label: 'Card Section 2',
+        fields: [],
+        conditions: {
+          action: 'show',
+          rules: [{ fieldKey: 'agree_checkbox', operator: 'equals', value: 'true' }]
+        }
+      };
+
+      expect(service.isFieldVisible(card2, { agree_checkbox: true })).toBe(true);
+      expect(service.isFieldVisible(card2, { agree_checkbox: 'true' })).toBe(true);
+      expect(service.isFieldVisible(card2, { agree_checkbox: false })).toBe(false);
+      expect(service.isFieldVisible(card2, { agree_checkbox: 'false' })).toBe(false);
+      expect(service.isFieldVisible(card2, { agree_checkbox: ['option_1'] })).toBe(true);
+      expect(service.isFieldVisible(card2, { agree_checkbox: [] })).toBe(false);
+      expect(service.isFieldVisible(card2, {})).toBe(false);
+    });
+
+    it('should find nested field across containers during rule fallback evaluation', () => {
+      const schema: FormSchema = {
+        formId: 'test_form',
+        title: 'Test Form',
+        layout: 'vertical',
+        fields: [
+          {
+            id: 'card_1',
+            key: 'card_1',
+            type: FieldType.CARD,
+            label: 'Card 1',
+            fields: [
+              {
+                id: 'nested_cb_id',
+                key: 'nested_cb_key',
+                type: FieldType.CHECKBOX,
+                label: 'Agree Checkbox'
+              }
+            ]
+          },
+          {
+            id: 'card_2',
+            key: 'card_2',
+            type: FieldType.CARD,
+            label: 'Card 2',
+            fields: [],
+            conditions: {
+              action: 'show',
+              rules: [{ fieldKey: 'nested_cb_id', operator: 'equals', value: 'true' }]
+            }
+          }
+        ]
+      };
+
+      // When formValues uses the key 'nested_cb_key' but rule uses id 'nested_cb_id'
+      expect(service.isFieldVisible(schema.fields[1], { nested_cb_key: true }, schema)).toBe(true);
+      expect(service.isFieldVisible(schema.fields[1], { nested_cb_key: false }, schema)).toBe(false);
     });
   });
 });

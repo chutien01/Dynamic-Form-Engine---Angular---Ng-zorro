@@ -13,7 +13,7 @@ import { SelectFieldSchema } from '../../../../core/models/schema.model';
       @if (field().label) {
         <nz-form-label [nzRequired]="field().required" [nzFor]="field().key || field().id">{{ field().label }}</nz-form-label>
       }
-      <nz-form-control [nzErrorTip]="'Please check your ' + field().label">
+      <nz-form-control [nzErrorTip]="field().validations?.customMessage || ('Vui lòng chọn ' + (field().label || 'trường này'))">
         <nz-select [formControlName]="field().key || field().id" [id]="field().key || field().id" [nzPlaceHolder]="field().placeholder || ''">
           @for (option of field().options; track option.value) {
             <nz-option [nzValue]="option.value" [nzLabel]="option.label"></nz-option>

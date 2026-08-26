@@ -13,8 +13,13 @@ import { DateRangeFieldSchema } from '../../../../core/models/schema.model';
       @if (field().label) {
         <nz-form-label [nzRequired]="field().required" [nzFor]="field().key || field().id">{{ field().label }}</nz-form-label>
       }
-      <nz-form-control [nzErrorTip]="'Please check your ' + field().label">
-        <nz-range-picker [formControlName]="field().key || field().id" [id]="field().key || field().id" style="width: 100%"></nz-range-picker>
+      <nz-form-control [nzErrorTip]="field().validations?.customMessage || ('Vui lòng chọn ' + (field().label || 'khoảng thời gian'))">
+        <nz-range-picker 
+          [formControlName]="field().key || field().id" 
+          [id]="field().key || field().id" 
+          [nzPlaceHolder]="getPlaceholders()"
+          style="width: 100%">
+        </nz-range-picker>
       </nz-form-control>
     </nz-form-item>
   `
@@ -22,4 +27,15 @@ import { DateRangeFieldSchema } from '../../../../core/models/schema.model';
 export class DateRangeFieldComponent {
   readonly field = input.required<DateRangeFieldSchema>();
   readonly formGroup = input.required<FormGroup>();
+
+  getPlaceholders(): [string, string] {
+    const p = this.field().placeholder;
+    if (Array.isArray(p) && p.length >= 2) {
+      return [p[0], p[1]];
+    }
+    if (typeof p === 'string' && p) {
+      return [p, p];
+    }
+    return ['Từ ngày', 'Đến ngày'];
+  }
 }

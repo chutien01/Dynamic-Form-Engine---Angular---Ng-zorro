@@ -13,7 +13,7 @@ import { RateFieldSchema } from '../../../../core/models/schema.model';
       @if (field().label) {
         <nz-form-label [nzRequired]="field().required" [nzFor]="field().key || field().id">{{ field().label }}</nz-form-label>
       }
-      <nz-form-control [nzErrorTip]="'Please check your ' + field().label">
+      <nz-form-control [nzErrorTip]="field().validations?.customMessage || ('Vui lòng đánh giá ' + (field().label || 'trường này'))">
         <nz-rate [formControlName]="field().key || field().id" [nzCount]="field().count || 5" [nzAllowHalf]="!!field().allowHalf"></nz-rate>
       </nz-form-control>
     </nz-form-item>

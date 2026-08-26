@@ -13,8 +13,8 @@ import { DateFieldSchema } from '../../../../core/models/schema.model';
       @if (field().label) {
         <nz-form-label [nzRequired]="field().required" [nzFor]="field().key || field().id">{{ field().label }}</nz-form-label>
       }
-      <nz-form-control [nzErrorTip]="'Please check your ' + field().label">
-        <nz-date-picker [formControlName]="field().key || field().id" [id]="field().key || field().id" style="width: 100%"></nz-date-picker>
+      <nz-form-control [nzErrorTip]="field().validations?.customMessage || ('Vui lòng chọn ' + (field().label || 'ngày'))">
+        <nz-date-picker [formControlName]="field().key || field().id" [id]="field().key || field().id" [nzPlaceHolder]="field().placeholder || ''" style="width: 100%"></nz-date-picker>
       </nz-form-control>
     </nz-form-item>
   `

@@ -2,7 +2,7 @@ import { Component, effect, inject, signal, ChangeDetectionStrategy } from '@ang
 import { DragDropModule, CdkDragDrop } from '@angular/cdk/drag-drop';
 import { NzGridModule } from 'ng-zorro-antd/grid';
 import { NzButtonModule } from 'ng-zorro-antd/button';
-import { NzDropDownModule } from 'ng-zorro-antd/dropdown';
+import { NzDropdownModule } from 'ng-zorro-antd/dropdown';
 import { NzTooltipModule } from 'ng-zorro-antd/tooltip';
 import { NzPopconfirmModule } from 'ng-zorro-antd/popconfirm';
 import { NzMessageService } from 'ng-zorro-antd/message';
@@ -26,7 +26,7 @@ export interface FieldTypeItem {
     DragDropModule, 
     NzGridModule,
     NzButtonModule,
-    NzDropDownModule,
+    NzDropdownModule,
     NzTooltipModule,
     NzPopconfirmModule
   ],
@@ -36,7 +36,7 @@ export interface FieldTypeItem {
 export class CanvasComponent {
   readonly state = inject(FormBuilderStateService);
   readonly registry = inject(FieldRegistryService);
-  readonly messageService = inject(NzMessageService);
+  private readonly messageService = inject(NzMessageService);
   
   readonly isDragging = signal(false);
   readonly dummyFormGroup = new FormGroup({});
@@ -66,25 +66,38 @@ export class CanvasComponent {
       const leafFields = extractAllLeafFields(fields);
       const currentKeys = new Set(leafFields.map(f => f.key || f.id));
 
-      // Remove controls that no longer exist
+      // 1. Remove controls that no longer exist
       Object.keys(this.dummyFormGroup.controls).forEach(key => {
         if (!currentKeys.has(key)) {
-          this.dummyFormGroup.removeControl(key, { emitEvent: false });
+          this.dummyFormGroup.removeControl(key);
         }
       });
 
-      // Add missing controls
+      // 2. Add missing controls as disabled or update value for preview only
       leafFields.forEach(field => {
         const controlKey = field.key || field.id;
-        if (!this.dummyFormGroup.contains(controlKey)) {
+        const targetValue = field.defaultValue !== undefined ? field.defaultValue : null;
+        
+        const ctrl = this.dummyFormGroup.get(controlKey);
+        if (!ctrl) {
           this.dummyFormGroup.addControl(
-            controlKey,
-            new FormControl({ value: field.defaultValue ?? '', disabled: true }),
-            { emitEvent: false }
+            controlKey, 
+            new FormControl({ value: targetValue, disabled: true })
           );
+        } else {
+          if (ctrl.value !== targetValue) {
+            ctrl.setValue(targetValue);
+          }
+          if (ctrl.enabled) {
+            ctrl.disable();
+          }
         }
       });
     });
+  }
+
+  isContainerField(type: FieldType): boolean {
+    return type === FieldType.CARD || type === FieldType.TABS || type === FieldType.COLLAPSE || type === FieldType.STEPS;
   }
 
   onDrop(event: CdkDragDrop<FieldSchema[], unknown, FieldType>): void {
@@ -106,11 +119,6 @@ export class CanvasComponent {
 
   onCanvasClick(): void {
     this.state.setActiveField(null);
-  }
-
-  openSettings(fieldId: string, event: MouseEvent): void {
-    event.stopPropagation();
-    this.state.openConfigModal(fieldId);
   }
 
   duplicate(fieldId: string, event: MouseEvent): void {
