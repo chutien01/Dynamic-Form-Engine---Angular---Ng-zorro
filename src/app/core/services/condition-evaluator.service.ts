@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 import { FieldConditions, FieldConditionRule, FieldSchema, FormSchema } from '../models/schema.model';
+import { extractAllLeafFields } from '../utils/schema.utils';
 
 @Injectable({
   providedIn: 'root'
@@ -19,9 +20,10 @@ export class ConditionEvaluatorService {
 
     let actualValue = formValues[rule.fieldKey];
 
-    // Fallback tìm theo key hoặc id nếu field key bị đổi
+    // Fallback tìm theo key hoặc id trong toàn bộ cây form đệ quy nếu field key bị đổi
     if (actualValue === undefined && schema?.fields) {
-      const matchedField = schema.fields.find(f => f.id === rule.fieldKey || f.key === rule.fieldKey);
+      const allLeaf = extractAllLeafFields(schema.fields);
+      const matchedField = allLeaf.find(f => f.id === rule.fieldKey || f.key === rule.fieldKey);
       if (matchedField) {
         const actualKey = matchedField.key || matchedField.id;
         actualValue = formValues[actualKey];
@@ -165,21 +167,46 @@ export class ConditionEvaluatorService {
     if (a === undefined || a === null || b === undefined || b === null) {
       return a === b;
     }
-    
-    // So sánh dạng số nếu cả 2 đều parse được ra số hợp lệ
+
+    // Xử lý trường hợp a là Array (ví dụ: Checkbox group hoặc Multi-select)
+    if (Array.isArray(a)) {
+      const strB = String(b).trim().toLowerCase();
+      if (typeof b === 'boolean' || strB === 'true' || strB === 'false') {
+        const boolB = b === true || strB === 'true';
+        return (a.length > 0) === boolB;
+      }
+      return a.some(item => this.isEqual(item, b));
+    }
+
+    // Xử lý trường hợp b là Array
+    if (Array.isArray(b)) {
+      const strA = String(a).trim().toLowerCase();
+      if (typeof a === 'boolean' || strA === 'true' || strA === 'false') {
+        const boolA = a === true || strA === 'true';
+        return (b.length > 0) === boolA;
+      }
+      return b.some(item => this.isEqual(item, a));
+    }
+
     const strA = String(a).trim();
     const strB = String(b).trim();
+
+    // So sánh dạng boolean (bao gồm boolean thực tế và chuỗi 'true'/'false')
+    const isBoolA = typeof a === 'boolean' || strA.toLowerCase() === 'true' || strA.toLowerCase() === 'false';
+    const isBoolB = typeof b === 'boolean' || strB.toLowerCase() === 'true' || strB.toLowerCase() === 'false';
+    if (isBoolA && isBoolB) {
+      const boolA = a === true || strA.toLowerCase() === 'true';
+      const boolB = b === true || strB.toLowerCase() === 'true';
+      return boolA === boolB;
+    }
+
+    // So sánh dạng số nếu cả 2 đều parse được ra số hợp lệ
     if (strA !== '' && strB !== '') {
       const numA = Number(strA);
       const numB = Number(strB);
       if (!isNaN(numA) && !isNaN(numB)) {
         return numA === numB;
       }
-    }
-
-    // So sánh dạng boolean
-    if (typeof a === 'boolean' || typeof b === 'boolean') {
-      return strA.toLowerCase() === strB.toLowerCase();
     }
 
     return strA.toLowerCase() === strB.toLowerCase();

@@ -11,6 +11,7 @@ export interface FieldValidation {
   pattern?: string;
   minLength?: number;
   maxLength?: number;
+  customMessage?: string;
 }
 
 export type ConditionOperator = 

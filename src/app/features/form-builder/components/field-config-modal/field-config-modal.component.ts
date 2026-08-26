@@ -12,7 +12,6 @@ import { NzSwitchModule } from 'ng-zorro-antd/switch';
 import { NzInputNumberModule } from 'ng-zorro-antd/input-number';
 import { NzButtonModule } from 'ng-zorro-antd/button';
 import { NzPopconfirmModule } from 'ng-zorro-antd/popconfirm';
-import { NzRadioModule } from 'ng-zorro-antd/radio';
 import { NzGridModule } from 'ng-zorro-antd/grid';
 import { NzTooltipModule } from 'ng-zorro-antd/tooltip';
 import { NzMessageService } from 'ng-zorro-antd/message';
@@ -25,11 +24,13 @@ import {
   ConditionOperator, 
   FieldConditions,
   FieldSchema,
-  CardFieldSchema,
-  TabsFieldSchema,
-  CollapseFieldSchema,
-  StepsFieldSchema
+  FieldValidation
 } from '../../../../core/models/schema.model';
+import { 
+  extractAllTriggerFieldsWithPath, 
+  TriggerFieldItem, 
+  extractAllLeafFields 
+} from '../../../../core/utils/schema.utils';
 
 @Component({
   selector: 'app-field-config-modal',
@@ -45,7 +46,6 @@ import {
     NzSwitchModule,
     NzInputNumberModule,
     NzButtonModule,
-    NzRadioModule,
     NzGridModule,
     NzTooltipModule,
     NzPopconfirmModule
@@ -62,8 +62,10 @@ export class FieldConfigModalComponent {
   readonly showPreview = signal(true);
   readonly previewField = signal<FieldSchema | null>(null);
   readonly previewFormGroup = new FormGroup({});
+  readonly isCustomMessageUserEdited = signal(false);
 
-  private readonly placeholderTypes = new Set<string>([
+  // Các kiểu field hỗ trợ placeholder
+  private readonly placeholderTypes = new Set<FieldType>([
     FieldType.TEXT_INPUT,
     FieldType.TEXT_AREA,
     FieldType.NUMBER,
@@ -72,26 +74,51 @@ export class FieldConfigModalComponent {
     FieldType.DATE_RANGE
   ]);
 
-  private readonly optionTypes = new Set<string>([
+  // Các kiểu field có options
+  private readonly optionTypes = new Set<FieldType>([
     FieldType.SELECT,
     FieldType.RADIO_GROUP,
     FieldType.CHECKBOX
   ]);
 
-  private readonly rangeTypes = new Set<string>([
-    FieldType.NUMBER,
-    FieldType.SLIDER
-  ]);
-
-  private readonly containerWithItemTypes = new Set<string>([
+  // Kiểu field Container
+  private readonly containerTypes = new Set<FieldType>([
+    FieldType.CARD,
     FieldType.TABS,
     FieldType.COLLAPSE,
     FieldType.STEPS
   ]);
 
-  readonly isCardField = computed(() => {
+  // Container có danh sách items
+  private readonly containerWithItemTypes = new Set<FieldType>([
+    FieldType.TABS,
+    FieldType.COLLAPSE,
+    FieldType.STEPS
+  ]);
+
+  readonly isContainer = computed(() => {
+    const current = this.state.activeField();
+    return current ? this.containerTypes.has(current.type) : false;
+  });
+
+  readonly isCard = computed(() => {
     const current = this.state.activeField();
     return current ? current.type === FieldType.CARD : false;
+  });
+
+  readonly isTabs = computed(() => {
+    const current = this.state.activeField();
+    return current ? current.type === FieldType.TABS : false;
+  });
+
+  readonly isCollapse = computed(() => {
+    const current = this.state.activeField();
+    return current ? current.type === FieldType.COLLAPSE : false;
+  });
+
+  readonly isSteps = computed(() => {
+    const current = this.state.activeField();
+    return current ? current.type === FieldType.STEPS : false;
   });
 
   readonly isContainerWithItems = computed(() => {
@@ -99,14 +126,10 @@ export class FieldConfigModalComponent {
     return current ? this.containerWithItemTypes.has(current.type) : false;
   });
 
-  readonly isContainerField = computed(() => {
-    const current = this.state.activeField();
-    return current ? (
-      current.type === FieldType.CARD ||
-      current.type === FieldType.TABS ||
-      current.type === FieldType.COLLAPSE ||
-      current.type === FieldType.STEPS
-    ) : false;
+  readonly itemPrefix = computed(() => {
+    if (this.isSteps()) return 'Step';
+    if (this.isCollapse()) return 'Panel';
+    return 'Tab';
   });
 
   readonly hasPlaceholder = computed(() => {
@@ -119,54 +142,91 @@ export class FieldConfigModalComponent {
     return current ? this.optionTypes.has(current.type) : false;
   });
 
-  readonly hasRange = computed(() => {
+  readonly isSwitch = computed(() => {
     const current = this.state.activeField();
-    return current ? this.rangeTypes.has(current.type) : false;
+    return current ? current.type === FieldType.SWITCH : false;
   });
 
-  readonly isRateField = computed(() => {
+  readonly isNumber = computed(() => {
+    const current = this.state.activeField();
+    return current ? current.type === FieldType.NUMBER : false;
+  });
+
+  readonly isSlider = computed(() => {
+    const current = this.state.activeField();
+    return current ? current.type === FieldType.SLIDER : false;
+  });
+
+  readonly hasMinMaxStep = computed(() => {
+    const current = this.state.activeField();
+    return current ? (current.type === FieldType.NUMBER || current.type === FieldType.SLIDER) : false;
+  });
+
+  readonly isRate = computed(() => {
     const current = this.state.activeField();
     return current ? current.type === FieldType.RATE : false;
   });
 
-  readonly isFileUploadField = computed(() => {
+  readonly isFileUpload = computed(() => {
     const current = this.state.activeField();
     return current ? current.type === FieldType.FILE_UPLOAD : false;
   });
 
-  readonly isTabsField = computed(() => {
+  readonly hasTextValidation = computed(() => {
     const current = this.state.activeField();
-    return current ? current.type === FieldType.TABS : false;
+    return current ? (current.type === FieldType.TEXT_INPUT || current.type === FieldType.TEXT_AREA) : false;
   });
 
-  readonly isCollapseField = computed(() => {
+  readonly hasNumberValidation = computed(() => {
     const current = this.state.activeField();
-    return current ? current.type === FieldType.COLLAPSE : false;
+    return current ? current.type === FieldType.NUMBER : false;
   });
 
-  readonly isStepsField = computed(() => {
-    const current = this.state.activeField();
-    return current ? current.type === FieldType.STEPS : false;
-  });
-
-  readonly availableTriggerFields = computed(() => {
+  readonly availableTriggerFieldGroups = computed(() => {
     const active = this.state.activeField();
     if (!active) return [];
-    return this.state.schema().fields.filter(f => f.id !== active.id);
+    const allTriggerItems = extractAllTriggerFieldsWithPath(this.state.schema().fields);
+
+    // Không cho chọn chính nó hoặc các trường con nằm bên trong chính container đang được chọn (để tránh circular dependency)
+    const activeChildIds = new Set<string>();
+    const collectChildIds = (f: FieldSchema) => {
+      activeChildIds.add(f.id);
+      if ('fields' in f && Array.isArray(f.fields)) f.fields.forEach(collectChildIds);
+      if ('items' in f && Array.isArray(f.items)) {
+        f.items.forEach((item: any) => {
+          if (Array.isArray(item.fields)) item.fields.forEach(collectChildIds);
+        });
+      }
+    };
+    collectChildIds(active);
+
+    const filtered = allTriggerItems.filter(item => !activeChildIds.has(item.id));
+
+    // Gom nhóm theo Container / Vị trí
+    const groupMap = new Map<string, TriggerFieldItem[]>();
+    for (const item of filtered) {
+      if (!groupMap.has(item.groupName)) {
+        groupMap.set(item.groupName, []);
+      }
+      groupMap.get(item.groupName)!.push(item);
+    }
+
+    const groups: { groupName: string; items: TriggerFieldItem[] }[] = [];
+    for (const [groupName, items] of groupMap.entries()) {
+      groups.push({ groupName, items });
+    }
+    return groups;
+  });
+
+  readonly totalAvailableTriggerFieldsCount = computed(() => {
+    return this.availableTriggerFieldGroups().reduce((acc, grp) => acc + grp.items.length, 0);
   });
 
   readonly formGroup = this.fb.group({
     // Display Tab
     label: this.fb.nonNullable.control(''),
-    labelPosition: this.fb.nonNullable.control<'top' | 'left' | 'right'>('top'),
     placeholder: this.fb.nonNullable.control(''),
-    description: this.fb.nonNullable.control(''),
-    tooltip: this.fb.nonNullable.control(''),
-    prefix: this.fb.nonNullable.control(''),
-    suffix: this.fb.nonNullable.control(''),
     gridSpan: this.fb.nonNullable.control(24),
-    disabled: this.fb.nonNullable.control(false),
-    hidden: this.fb.nonNullable.control(false),
 
     // Data Tab
     key: this.fb.nonNullable.control(''),
@@ -185,7 +245,9 @@ export class FieldConfigModalComponent {
     minLength: this.fb.control<number | null>(null),
     maxLength: this.fb.control<number | null>(null),
     pattern: this.fb.nonNullable.control(''),
-    customErrorMessage: this.fb.nonNullable.control(''),
+    validationMin: this.fb.control<number | null>(null),
+    validationMax: this.fb.control<number | null>(null),
+    customMessage: this.fb.nonNullable.control(''),
 
     // Conditional Tab
     enableConditions: this.fb.nonNullable.control(false),
@@ -195,15 +257,7 @@ export class FieldConfigModalComponent {
     conditionValue: this.fb.nonNullable.control<unknown>(''),
     conditionMatchType: this.fb.nonNullable.control<'all' | 'any'>('all'),
 
-    // API Tab
-    apiUrl: this.fb.nonNullable.control(''),
-    apiMethod: this.fb.nonNullable.control<'GET' | 'POST'>('GET'),
-    apiDataPath: this.fb.nonNullable.control(''),
-
-    // Logic Tab
-    customLogic: this.fb.nonNullable.control(''),
-
-    // Layout / Container Tab
+    // Layout Tab (Containers only)
     items: this.fb.array<FormGroup<{ id: FormControl<string>; title: FormControl<string>; description: FormControl<string> }>>([]),
     bordered: this.fb.nonNullable.control(true),
     tabType: this.fb.nonNullable.control<'line' | 'card'>('line'),
@@ -212,6 +266,11 @@ export class FieldConfigModalComponent {
     direction: this.fb.nonNullable.control<'horizontal' | 'vertical'>('horizontal'),
     size: this.fb.nonNullable.control<'default' | 'small'>('default')
   });
+
+  readonly enableConditions = toSignal(
+    this.formGroup.controls.enableConditions.valueChanges,
+    { initialValue: this.formGroup.controls.enableConditions.value }
+  );
 
   readonly currentOperator = toSignal(
     this.formGroup.controls.conditionOperator.valueChanges,
@@ -228,12 +287,27 @@ export class FieldConfigModalComponent {
     return op !== 'is_empty' && op !== 'is_not_empty';
   });
 
-  readonly triggerFieldOptions = computed(() => {
+  readonly triggerField = computed(() => {
     const triggerKey = this.currentTriggerKey();
-    if (!triggerKey) return [];
-    const field = this.state.schema().fields.find(f => f.key === triggerKey || f.id === triggerKey);
-    if (field && 'options' in field && Array.isArray(field.options)) {
-      return field.options;
+    if (!triggerKey) return null;
+    const allLeafFields = extractAllLeafFields(this.state.schema().fields);
+    return allLeafFields.find(f => f.key === triggerKey || f.id === triggerKey) || null;
+  });
+
+  readonly triggerFieldOptions = computed(() => {
+    const field = this.triggerField();
+    if (!field) return [];
+    if (field.type === FieldType.CHECKBOX || field.type === FieldType.SWITCH) {
+      return [
+        { label: '☑️ Được chọn / Bật (true)', value: 'true' },
+        { label: '⬜ Không chọn / Tắt (false)', value: 'false' }
+      ];
+    }
+    if ('options' in field && Array.isArray(field.options)) {
+      return field.options.map(opt => ({
+        label: opt.label || String(opt.value),
+        value: String(opt.value)
+      }));
     }
     return [];
   });
@@ -241,14 +315,17 @@ export class FieldConfigModalComponent {
   private lastLoadedFieldId: string | null = null;
 
   constructor() {
-    // Real-time Live Preview computation
     this.formGroup.valueChanges
       .pipe(takeUntilDestroyed())
       .subscribe(() => {
+        // Tự động cập nhật customMessage gợi ý nếu người dùng chưa tự chỉnh sửa
+        if (!this.isCustomMessageUserEdited()) {
+          const suggested = this.generateSuggestedMessage();
+          this.formGroup.controls.customMessage.setValue(suggested, { emitEvent: false });
+        }
         this.updateLivePreview();
       });
 
-    // Populate modal when activeField or modal visibility changes
     effect(() => {
       const isOpen = this.state.isConfigModalOpen();
       const currentField = this.state.activeField();
@@ -271,38 +348,36 @@ export class FieldConfigModalComponent {
   }
 
   private loadFieldIntoForm(field: FieldSchema): void {
-    const anyField = field as any;
-    const placeholder = typeof anyField.placeholder === 'string' ? anyField.placeholder : '';
+    const anyField = field as Record<string, any>;
+    const placeholder = typeof anyField['placeholder'] === 'string' ? anyField['placeholder'] : '';
     const hasConditions = !!(field.conditions && field.conditions.rules?.length);
     const firstRule = hasConditions ? field.conditions!.rules[0] : null;
 
+    const savedCustomMessage = field.validations?.customMessage || '';
+    this.isCustomMessageUserEdited.set(!!savedCustomMessage.trim());
+
     this.formGroup.patchValue({
       label: field.label || '',
-      labelPosition: anyField.labelPosition || 'top',
       placeholder,
-      description: anyField.description || '',
-      tooltip: anyField.tooltip || '',
-      prefix: anyField.prefix || '',
-      suffix: anyField.suffix || '',
       gridSpan: field.gridSpan || 24,
-      disabled: !!anyField.disabled,
-      hidden: !!anyField.hidden,
 
       key: field.key || field.id,
       defaultValue: field.defaultValue ?? null,
-      min: anyField.min ?? null,
-      max: anyField.max ?? null,
-      step: anyField.step ?? null,
-      count: anyField.count ?? 5,
-      allowHalf: !!anyField.allowHalf,
-      maxCount: anyField.maxCount ?? 1,
-      accept: anyField.accept || '',
+      min: anyField['min'] ?? null,
+      max: anyField['max'] ?? null,
+      step: anyField['step'] ?? null,
+      count: anyField['count'] ?? 5,
+      allowHalf: !!anyField['allowHalf'],
+      maxCount: anyField['maxCount'] ?? 1,
+      accept: anyField['accept'] || '',
 
       required: !!field.required,
       minLength: field.validations?.minLength ?? null,
       maxLength: field.validations?.maxLength ?? null,
       pattern: field.validations?.pattern || '',
-      customErrorMessage: anyField.customErrorMessage || '',
+      validationMin: field.validations?.min ?? null,
+      validationMax: field.validations?.max ?? null,
+      customMessage: savedCustomMessage,
 
       enableConditions: hasConditions,
       conditionAction: field.conditions?.action || 'show',
@@ -311,18 +386,19 @@ export class FieldConfigModalComponent {
       conditionValue: firstRule?.value ?? '',
       conditionMatchType: field.conditions?.matchType || 'all',
 
-      apiUrl: anyField.apiUrl || '',
-      apiMethod: anyField.apiMethod || 'GET',
-      apiDataPath: anyField.apiDataPath || '',
-      customLogic: anyField.customLogic || '',
-
-      bordered: anyField.bordered ?? true,
-      tabType: anyField.tabType || 'line',
-      tabPosition: anyField.tabPosition || 'top',
-      accordion: !!anyField.accordion,
-      direction: anyField.direction || 'horizontal',
-      size: anyField.size || 'default'
+      bordered: anyField['bordered'] ?? true,
+      tabType: anyField['tabType'] || 'line',
+      tabPosition: anyField['tabPosition'] || 'top',
+      accordion: !!anyField['accordion'],
+      direction: anyField['direction'] || 'horizontal',
+      size: anyField['size'] || 'default'
     }, { emitEvent: false });
+
+    // Nếu chưa có message tự tạo trước đó, tự động sinh message gợi ý ban đầu
+    if (!savedCustomMessage.trim()) {
+      const suggested = this.generateSuggestedMessage();
+      this.formGroup.patchValue({ customMessage: suggested }, { emitEvent: false });
+    }
 
     // Populate Options
     this.optionsArray.clear({ emitEvent: false });
@@ -345,6 +421,93 @@ export class FieldConfigModalComponent {
     this.updateLivePreview();
   }
 
+  /**
+   * Sinh thông báo lỗi tùy chỉnh gợi ý thông minh dựa trên các điều kiện validation
+   */
+  generateSuggestedMessage(): string {
+    const active = this.state.activeField();
+    if (!active || this.isContainer()) return '';
+
+    const label = this.formGroup.controls.label.value.trim() || 'Trường này';
+    const type = active.type;
+    const required = this.formGroup.controls.required.value;
+    const minLength = this.formGroup.controls.minLength.value;
+    const maxLength = this.formGroup.controls.maxLength.value;
+    const pattern = this.formGroup.controls.pattern.value.trim();
+    const valMin = this.formGroup.controls.validationMin.value;
+    const valMax = this.formGroup.controls.validationMax.value;
+
+    const parts: string[] = [];
+
+    // Length validation
+    if (minLength !== null && maxLength !== null) {
+      parts.push(`tối thiểu ${minLength} ký tự, tối đa ${maxLength} ký tự`);
+    } else if (minLength !== null) {
+      parts.push(`ít nhất ${minLength} ký tự`);
+    } else if (maxLength !== null) {
+      parts.push(`tối đa ${maxLength} ký tự`);
+    }
+
+    // Value Range validation
+    if (valMin !== null && valMax !== null) {
+      parts.push(`giá trị từ ${valMin} đến ${valMax}`);
+    } else if (valMin !== null) {
+      parts.push(`giá trị lớn hơn hoặc bằng ${valMin}`);
+    } else if (valMax !== null) {
+      parts.push(`giá trị nhỏ hơn hoặc bằng ${valMax}`);
+    }
+
+    // Pattern
+    if (pattern) {
+      parts.push(`đúng định dạng quy định`);
+    }
+
+    if (parts.length > 0) {
+      const constraints = parts.join(' và ');
+      if (required) {
+        return `${label} là bắt buộc và phải có ${constraints}.`;
+      }
+      return `${label} phải có ${constraints}.`;
+    }
+
+    if (required) {
+      const actionVerb = this.getActionVerb(type);
+      return `Vui lòng ${actionVerb} ${label}.`;
+    }
+
+    return '';
+  }
+
+  private getActionVerb(type: FieldType): string {
+    switch (type) {
+      case FieldType.SELECT:
+      case FieldType.RADIO_GROUP:
+      case FieldType.CHECKBOX:
+      case FieldType.DATE_PICKER:
+      case FieldType.DATE_RANGE:
+        return 'chọn';
+      case FieldType.FILE_UPLOAD:
+        return 'tải lên tệp cho';
+      case FieldType.RATE:
+        return 'đánh giá';
+      case FieldType.SWITCH:
+        return 'xác nhận';
+      default:
+        return 'nhập';
+    }
+  }
+
+  onCustomMessageInput(): void {
+    this.isCustomMessageUserEdited.set(true);
+  }
+
+  resetToSuggestedMessage(): void {
+    const suggested = this.generateSuggestedMessage();
+    this.formGroup.controls.customMessage.setValue(suggested);
+    this.isCustomMessageUserEdited.set(false);
+    this.messageService.info('Đã tự động cập nhật thông báo lỗi theo các điều kiện validation');
+  }
+
   private updateLivePreview(): void {
     const current = this.state.activeField();
     if (!current) {
@@ -356,49 +519,115 @@ export class FieldConfigModalComponent {
     const preview: any = {
       ...structuredClone(current),
       label: val.label,
-      key: val.key,
-      placeholder: val.placeholder,
-      required: val.required,
-      gridSpan: val.gridSpan,
-      defaultValue: val.defaultValue,
-      options: val.options
+      gridSpan: val.gridSpan
     };
 
-    if (val.min !== null) preview.min = val.min;
-    if (val.max !== null) preview.max = val.max;
-    if (val.step !== null) preview.step = val.step;
-    if (val.count !== null) preview.count = val.count;
-    preview.allowHalf = val.allowHalf;
-    if (val.maxCount !== null) preview.maxCount = val.maxCount;
-    preview.accept = val.accept;
+    if (this.hasPlaceholder()) preview.placeholder = val.placeholder;
 
-    preview.bordered = val.bordered;
-    preview.tabType = val.tabType;
-    preview.tabPosition = val.tabPosition;
-    preview.accordion = val.accordion;
-    preview.direction = val.direction;
-    preview.size = val.size;
+    if (!this.isContainer()) {
+      preview.key = val.key;
+      preview.defaultValue = val.defaultValue;
+      preview.required = val.required;
 
-    if (Array.isArray(val.items) && 'items' in current) {
-      const existingItems = Array.isArray(current.items) ? current.items : [];
-      preview.items = val.items.map((formItem: any) => {
-        const matched = existingItems.find(ex => ex.id === formItem.id);
-        return {
-          id: formItem.id,
-          title: formItem.title,
-          description: formItem.description,
-          fields: matched ? matched.fields : []
-        };
-      });
+      if (this.hasOptions()) preview.options = val.options;
+      if (this.hasMinMaxStep()) {
+        if (val.min !== null) preview.min = val.min;
+        if (val.max !== null) preview.max = val.max;
+        if (val.step !== null) preview.step = val.step;
+      }
+      if (this.isRate()) {
+        if (val.count !== null) preview.count = val.count;
+        preview.allowHalf = val.allowHalf;
+      }
+      if (this.isFileUpload()) {
+        if (val.maxCount !== null) preview.maxCount = val.maxCount;
+        preview.accept = val.accept;
+      }
+
+      // Validations
+      const validations: FieldValidation = {};
+      if (this.hasTextValidation()) {
+        if (val.minLength !== null) validations.minLength = val.minLength;
+        if (val.maxLength !== null) validations.maxLength = val.maxLength;
+        if (val.pattern) validations.pattern = val.pattern;
+      }
+      if (this.hasNumberValidation()) {
+        if (val.validationMin !== null) validations.min = val.validationMin;
+        if (val.validationMax !== null) validations.max = val.validationMax;
+      }
+      if (val.customMessage && val.customMessage.trim()) {
+        validations.customMessage = val.customMessage.trim();
+      }
+
+      if (Object.keys(validations).length > 0) {
+        preview.validations = validations;
+      }
+    } else {
+      if (this.isCard() || this.isCollapse()) preview.bordered = val.bordered;
+      if (this.isTabs()) {
+        preview.tabType = val.tabType;
+        preview.tabPosition = val.tabPosition;
+      }
+      if (this.isCollapse()) preview.accordion = val.accordion;
+      if (this.isSteps()) {
+        preview.direction = val.direction;
+        preview.size = val.size;
+      }
+      if (this.isContainerWithItems() && Array.isArray(val.items) && 'items' in current) {
+        const existingItems = Array.isArray(current.items) ? current.items : [];
+        preview.items = val.items.map((formItem: any) => {
+          const matched = existingItems.find(ex => ex.id === formItem.id);
+          return {
+            id: formItem.id,
+            title: formItem.title,
+            description: formItem.description,
+            fields: matched ? matched.fields : []
+          };
+        });
+      }
     }
 
     this.previewField.set(preview as FieldSchema);
 
-    // Sync preview form group control
-    const controlKey = preview.key || preview.id;
-    if (!this.previewFormGroup.contains(controlKey)) {
-      this.previewFormGroup.addControl(controlKey, new FormControl(preview.defaultValue ?? ''));
-    }
+    // Sync preview form group control and update value (recursively for containers and child fields)
+    this.syncPreviewFormGroup(preview as FieldSchema);
+  }
+
+  private syncPreviewFormGroup(preview: FieldSchema): void {
+    const requiredKeys = new Set<string>();
+
+    const collectAndSync = (f: any) => {
+      if (!f) return;
+      if (this.containerTypes.has(f.type)) {
+        if (Array.isArray(f.fields)) {
+          f.fields.forEach(collectAndSync);
+        }
+        if (Array.isArray(f.items)) {
+          f.items.forEach((item: any) => {
+            if (Array.isArray(item.fields)) {
+              item.fields.forEach(collectAndSync);
+            }
+          });
+        }
+      } else {
+        const key = f.key || f.id;
+        requiredKeys.add(key);
+        if (!this.previewFormGroup.contains(key)) {
+          this.previewFormGroup.addControl(key, new FormControl(f.defaultValue ?? ''));
+        } else {
+          this.previewFormGroup.get(key)?.setValue(f.defaultValue ?? '', { emitEvent: false });
+        }
+      }
+    };
+
+    collectAndSync(preview);
+
+    // Remove obsolete controls
+    Object.keys(this.previewFormGroup.controls).forEach(k => {
+      if (!requiredKeys.has(k)) {
+        this.previewFormGroup.removeControl(k);
+      }
+    });
   }
 
   private createOptionGroup(label: string, value: unknown) {
@@ -429,9 +658,7 @@ export class FieldConfigModalComponent {
 
   addContainerItem(): void {
     const count = this.itemsArray.length + 1;
-    const type = this.state.activeField()?.type;
-    const prefix = type === FieldType.STEPS ? 'Step' : (type === FieldType.COLLAPSE ? 'Panel' : 'Tab');
-    this.itemsArray.push(this.createItemGroup(uuidv4(), `${prefix} ${count}`, ''));
+    this.itemsArray.push(this.createItemGroup(uuidv4(), `${this.itemPrefix()} ${count}`, ''));
     this.updateLivePreview();
   }
 
@@ -466,67 +693,80 @@ export class FieldConfigModalComponent {
       ]
     } : undefined;
 
-    const validations = {
-      ...(val.minLength !== null ? { minLength: val.minLength } : {}),
-      ...(val.maxLength !== null ? { maxLength: val.maxLength } : {}),
-      ...(val.pattern ? { pattern: val.pattern } : {})
-    };
-
-    const updatePayload: Partial<FieldSchema> = {
-      key: val.key,
+    const updatePayload: Record<string, any> = {
       label: val.label,
-      placeholder: val.placeholder,
-      required: val.required,
       gridSpan: val.gridSpan,
-      defaultValue: val.defaultValue,
-      options: val.options as FieldOption[],
-      validations: Object.keys(validations).length ? validations : undefined,
       conditions
     };
 
-    const anyPayload = updatePayload as any;
-    if (val.labelPosition) anyPayload.labelPosition = val.labelPosition;
-    if (val.description) anyPayload.description = val.description;
-    if (val.tooltip) anyPayload.tooltip = val.tooltip;
-    if (val.prefix) anyPayload.prefix = val.prefix;
-    if (val.suffix) anyPayload.suffix = val.suffix;
-    anyPayload.disabled = val.disabled;
-    anyPayload.hidden = val.hidden;
+    if (!this.isContainer()) {
+      updatePayload['key'] = val.key;
+      updatePayload['defaultValue'] = val.defaultValue;
+      updatePayload['required'] = val.required;
 
-    if (val.min !== null) anyPayload.min = val.min;
-    if (val.max !== null) anyPayload.max = val.max;
-    if (val.step !== null) anyPayload.step = val.step;
-    if (val.count !== null) anyPayload.count = val.count;
-    anyPayload.allowHalf = val.allowHalf;
-    if (val.maxCount !== null) anyPayload.maxCount = val.maxCount;
-    if (val.accept) anyPayload.accept = val.accept;
+      if (this.hasPlaceholder()) updatePayload['placeholder'] = val.placeholder;
+      if (this.hasOptions()) updatePayload['options'] = val.options as FieldOption[];
+      if (this.hasMinMaxStep()) {
+        if (val.min !== null) updatePayload['min'] = val.min;
+        if (val.max !== null) updatePayload['max'] = val.max;
+        if (val.step !== null) updatePayload['step'] = val.step;
+      }
+      if (this.isRate()) {
+        if (val.count !== null) updatePayload['count'] = val.count;
+        updatePayload['allowHalf'] = val.allowHalf;
+      }
+      if (this.isFileUpload()) {
+        if (val.maxCount !== null) updatePayload['maxCount'] = val.maxCount;
+        if (val.accept) updatePayload['accept'] = val.accept;
+      }
 
-    if (val.apiUrl) anyPayload.apiUrl = val.apiUrl;
-    if (val.apiMethod) anyPayload.apiMethod = val.apiMethod;
-    if (val.apiDataPath) anyPayload.apiDataPath = val.apiDataPath;
-    if (val.customLogic) anyPayload.customLogic = val.customLogic;
+      // Validations
+      const validations: FieldValidation = {};
+      if (this.hasTextValidation()) {
+        if (val.minLength !== null) validations.minLength = val.minLength;
+        if (val.maxLength !== null) validations.maxLength = val.maxLength;
+        if (val.pattern) validations.pattern = val.pattern;
+      }
+      if (this.hasNumberValidation()) {
+        if (val.validationMin !== null) validations.min = val.validationMin;
+        if (val.validationMax !== null) validations.max = val.validationMax;
+      }
+      if (val.customMessage && val.customMessage.trim()) {
+        validations.customMessage = val.customMessage.trim();
+      }
 
-    if (val.bordered !== undefined) anyPayload.bordered = val.bordered;
-    if (val.tabType) anyPayload.tabType = val.tabType;
-    if (val.tabPosition) anyPayload.tabPosition = val.tabPosition;
-    if (val.accordion !== undefined) anyPayload.accordion = val.accordion;
-    if (val.direction) anyPayload.direction = val.direction;
-    if (val.size) anyPayload.size = val.size;
+      if (Object.keys(validations).length > 0) {
+        updatePayload['validations'] = validations;
+      } else {
+        delete updatePayload['validations'];
+      }
+    } else {
+      if (this.isCard() || this.isCollapse()) updatePayload['bordered'] = val.bordered;
+      if (this.isTabs()) {
+        updatePayload['tabType'] = val.tabType;
+        updatePayload['tabPosition'] = val.tabPosition;
+      }
+      if (this.isCollapse()) updatePayload['accordion'] = val.accordion;
+      if (this.isSteps()) {
+        updatePayload['direction'] = val.direction;
+        updatePayload['size'] = val.size;
+      }
 
-    if (val.items && Array.isArray(val.items) && 'items' in active) {
-      const existingItems = Array.isArray(active.items) ? active.items : [];
-      anyPayload.items = val.items.map((formItem: any) => {
-        const matched = existingItems.find(ex => ex.id === formItem.id);
-        return {
-          id: formItem.id,
-          title: formItem.title,
-          description: formItem.description,
-          fields: matched ? matched.fields : []
-        };
-      });
+      if (this.isContainerWithItems() && val.items && Array.isArray(val.items) && 'items' in active) {
+        const existingItems = Array.isArray(active.items) ? active.items : [];
+        updatePayload['items'] = val.items.map((formItem: any) => {
+          const matched = existingItems.find(ex => ex.id === formItem.id);
+          return {
+            id: formItem.id,
+            title: formItem.title,
+            description: formItem.description,
+            fields: matched ? matched.fields : []
+          };
+        });
+      }
     }
 
-    this.state.updateActiveField(updatePayload);
+    this.state.updateActiveField(updatePayload as Partial<FieldSchema>);
     this.state.closeConfigModal();
     this.messageService.success('Đã lưu cấu hình trường thành công');
   }

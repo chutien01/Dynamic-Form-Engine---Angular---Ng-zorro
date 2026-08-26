@@ -1,27 +1,39 @@
-import { Component, input, inject, ChangeDetectionStrategy } from '@angular/core';
-import { FormGroup } from '@angular/forms';
+import { Component, input, inject, signal, computed, ChangeDetectionStrategy } from '@angular/core';
+import { FormGroup, FormsModule } from '@angular/forms';
 import { NgComponentOutlet } from '@angular/common';
 import { DragDropModule, CdkDragDrop } from '@angular/cdk/drag-drop';
 import { NzGridModule } from 'ng-zorro-antd/grid';
 import { NzButtonModule } from 'ng-zorro-antd/button';
-import { NzDropDownModule } from 'ng-zorro-antd/dropdown';
+import { NzDropdownModule } from 'ng-zorro-antd/dropdown';
 import { NzTooltipModule } from 'ng-zorro-antd/tooltip';
 import { NzPopconfirmModule } from 'ng-zorro-antd/popconfirm';
+import { NzModalModule } from 'ng-zorro-antd/modal';
+import { NzInputModule } from 'ng-zorro-antd/input';
 import { NzMessageService } from 'ng-zorro-antd/message';
 import { FieldConditions, FieldSchema, FieldType } from '../../../../../core/models/schema.model';
+import { ConditionEvaluatorService } from '../../../../../core/services/condition-evaluator.service';
 import { FormBuilderStateService } from '../../../../../features/form-builder/services/form-builder.state.service';
 import { FieldRegistryService } from '../../../services/field-registry.service';
+
+export interface ChildFieldTypeItem {
+  type: FieldType;
+  label: string;
+  icon: string;
+}
 
 @Component({
   selector: 'app-container-dropzone',
   imports: [
+    FormsModule,
     NgComponentOutlet,
     DragDropModule,
     NzGridModule,
     NzButtonModule,
-    NzDropDownModule,
+    NzDropdownModule,
     NzTooltipModule,
-    NzPopconfirmModule
+    NzPopconfirmModule,
+    NzModalModule,
+    NzInputModule
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -29,11 +41,12 @@ import { FieldRegistryService } from '../../../services/field-registry.service';
       <div 
         nz-row [nzGutter]="[12, 16]"
         [id]="'container_' + (itemId() || containerId())"
-        class="min-h-[100px] items-start content-start border-2 border-dashed border-indigo-200 rounded-xl p-3 bg-indigo-50/20 w-full"
+        class="min-h-[110px] items-start content-start border-2 border-dashed border-indigo-200 hover:border-indigo-400 hover:bg-indigo-50/40 rounded-xl p-3.5 bg-indigo-50/20 w-full transition-all cursor-pointer relative"
         cdkDropList
         [cdkDropListData]="fields()"
         [cdkDropListConnectedTo]="state.connectedDropLists()"
         (cdkDropListDropped)="onDrop($event)"
+        (click)="openAddModal($event)"
       >
         @for (child of fields(); track child.id) {
           <div 
@@ -95,23 +108,6 @@ import { FieldRegistryService } from '../../../services/field-registry.service';
               [class.scale-100]="state.activeFieldId() === child.id"
               (click)="$event.stopPropagation()"
             >
-              <!-- Edit / Settings (Amber Accent) -->
-              <button 
-                type="button" 
-                nz-button 
-                nzType="text" 
-                nzSize="small" 
-                nz-tooltip 
-                nzTooltipTitle="Cài đặt trường (Settings)"
-                (click)="openSettings(child.id, $event)"
-                class="!flex !items-center !justify-center !w-6 !h-6 !p-0 !min-w-0 !rounded-full !bg-amber-50 hover:!bg-amber-100 !text-amber-600 transition-colors shadow-2xs"
-              >
-                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <circle cx="12" cy="12" r="3"></circle>
-                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-                </svg>
-              </button>
-
               <!-- Add Before (Blue Accent) -->
               <button 
                 type="button" 
@@ -223,41 +219,108 @@ import { FieldRegistryService } from '../../../services/field-registry.service';
               </button>
             </div>
 
-            <div>
+            <div [class.pointer-events-none]="isBuilder()" [class.select-none]="isBuilder()">
               <ng-container *ngComponentOutlet="
                 registry.getComponent(child.type); 
-                inputs: { field: child, formGroup: formGroup(), isBuilder: false }
+                inputs: { field: child, formGroup: formGroup(), isBuilder: isBuilder() }
               "></ng-container>
             </div>
           </div>
         }
 
-        <!-- Centered + Button inside this dropzone -->
-        <div class="w-full flex flex-col items-center justify-center py-4 text-center">
-          <button 
-            type="button" 
-            nz-button 
-            nzType="dashed"
-            nz-dropdown 
-            [nzDropdownMenu]="addMenu"
-            (click)="$event.stopPropagation()"
-            class="!flex !items-center !gap-1.5 !rounded-full !px-5 !py-2 !border-indigo-400 hover:!border-indigo-600 hover:!text-indigo-600 !bg-white shadow-sm transition-all"
-          >
-            <span class="text-lg font-bold text-indigo-600">+</span>
-            <span class="text-xs font-semibold">Thêm trường vào {{ label() || 'Container' }}</span>
-          </button>
-          <nz-dropdown-menu #addMenu="nzDropdownMenu">
-            <ul nz-menu class="max-h-60 overflow-y-auto">
-              @for (ft of childFieldTypes; track ft.type) {
-                <li nz-menu-item (click)="onAdd(ft.type, $event)">
-                  <span class="mr-2">{{ ft.icon }}</span>
-                  <span>{{ ft.label }}</span>
-                </li>
-              }
-            </ul>
-          </nz-dropdown-menu>
-        </div>
+        <!-- Dropzone Empty / Add Prompt in Center -->
+        @if (!fields().length) {
+          <div class="w-full py-6 flex flex-col items-center justify-center text-center select-none pointer-events-none">
+            <div class="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 text-xl font-bold mb-2 shadow-2xs">
+              +
+            </div>
+            <span class="text-xs font-semibold text-indigo-700">Nhấp vào đây để thêm trường vào {{ label() || 'Container' }}</span>
+            <span class="text-[11px] text-indigo-400 mt-0.5">hoặc kéo thả trường từ Toolbox vào vùng này</span>
+          </div>
+        } @else {
+          <div class="w-full flex items-center justify-center pt-2 pb-1 text-center">
+            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-dashed border-indigo-300 bg-white/90 text-indigo-600 text-xs font-medium shadow-2xs pointer-events-none">
+              <span class="font-bold text-sm">+</span>
+              <span>Nhấp vào vùng trống để thêm trường</span>
+            </span>
+          </div>
+        }
       </div>
+
+      <!-- Modal Add Field to Container with Search Input -->
+      <nz-modal
+        [nzVisible]="isAddModalOpen()"
+        [nzTitle]="modalTitleTpl"
+        [nzFooter]="null"
+        [nzWidth]="640"
+        (nzOnCancel)="isAddModalOpen.set(false)"
+        [nzCentered]="true"
+      >
+        <ng-template #modalTitleTpl>
+          <div class="flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-base text-indigo-600">
+              📦
+            </div>
+            <div>
+              <h4 class="text-sm font-bold text-gray-800 !mb-0">Thêm trường vào {{ label() || 'Container' }}</h4>
+              <p class="text-xs text-gray-500 font-normal !mb-0">Tìm kiếm hoặc chọn loại trường nhập liệu để chèn vào vùng chứa</p>
+            </div>
+          </div>
+        </ng-template>
+
+        <ng-container *nzModalContent>
+          <div class="py-2">
+            <!-- Search Field Input -->
+            <div class="mb-3.5">
+              <nz-input-group [nzPrefix]="searchPrefixTpl" class="!rounded-xl !bg-slate-50 border border-slate-200 hover:border-indigo-400 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
+                <input 
+                  nz-input 
+                  [ngModel]="searchQuery()" 
+                  (ngModelChange)="searchQuery.set($event)"
+                  placeholder="Tìm kiếm trường (Text, Number, Date, Select, Switch...)" 
+                  class="!bg-transparent text-xs py-1.5"
+                />
+              </nz-input-group>
+              <ng-template #searchPrefixTpl>
+                <span class="text-gray-400 text-xs mr-1">🔍</span>
+              </ng-template>
+            </div>
+
+            <!-- Field Cards Grid -->
+            <div class="max-h-[55vh] overflow-y-auto pr-1">
+              @if (filteredChildFieldTypes().length > 0) {
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                  @for (ft of filteredChildFieldTypes(); track ft.type) {
+                    <button
+                      type="button"
+                      (click)="onSelectFieldType(ft.type)"
+                      class="flex items-center gap-2.5 p-2.5 rounded-xl border border-slate-200 hover:border-indigo-500 bg-white hover:bg-indigo-50/40 text-left transition-all group shadow-2xs hover:shadow-md cursor-pointer w-full"
+                    >
+                      <div class="w-9 h-9 rounded-lg bg-slate-50 group-hover:bg-indigo-100 flex items-center justify-center text-lg shrink-0 group-hover:scale-110 transition-transform">
+                        {{ ft.icon }}
+                      </div>
+                      <div class="flex-1 min-w-0">
+                        <span class="text-xs font-bold text-gray-800 group-hover:text-indigo-600 block truncate">
+                          {{ ft.label }}
+                        </span>
+                        <span class="text-[10px] font-mono text-gray-400 uppercase block truncate">
+                          {{ ft.type }}
+                        </span>
+                      </div>
+                    </button>
+                  }
+                </div>
+              } @else {
+                <div class="py-8 text-center text-gray-400 flex flex-col items-center justify-center">
+                  <span class="text-2xl mb-1.5">🔍</span>
+                  <span class="text-xs font-semibold text-gray-600">Không tìm thấy trường nào phù hợp</span>
+                  <span class="text-[11px] text-gray-400 mt-0.5">Hãy thử tìm với từ khóa khác (ví dụ: Text, Date, Select...)</span>
+                </div>
+              }
+            </div>
+          </div>
+        </ng-container>
+      </nz-modal>
     } @else {
       <!-- RUNNER MODE: Clean layout without dropzone or builder buttons -->
       <div nz-row [nzGutter]="16" class="w-full">
@@ -265,12 +328,14 @@ import { FieldRegistryService } from '../../../services/field-registry.service';
           <div class="text-gray-400 text-xs py-4 text-center w-full">Trống</div>
         }
         @for (child of fields(); track child.id) {
-          <div nz-col [nzSpan]="child.gridSpan || 24">
-            <ng-container *ngComponentOutlet="
-              registry.getComponent(child.type); 
-              inputs: { field: child, formGroup: formGroup(), isBuilder: false }
-            "></ng-container>
-          </div>
+          @if (isChildVisible(child)) {
+            <div nz-col [nzSpan]="child.gridSpan || 24">
+              <ng-container *ngComponentOutlet="
+                registry.getComponent(child.type); 
+                inputs: { field: child, formGroup: formGroup(), isBuilder: false }
+              "></ng-container>
+            </div>
+          }
         }
       </div>
     }
@@ -284,11 +349,19 @@ export class ContainerDropzoneComponent {
   readonly isBuilder = input<boolean>(false);
   readonly label = input<string>('');
 
+  readonly isAddModalOpen = signal(false);
+  readonly searchQuery = signal('');
+
   protected readonly state = inject(FormBuilderStateService);
   protected readonly registry = inject(FieldRegistryService);
   private readonly messageService = inject(NzMessageService);
+  private readonly evaluator = inject(ConditionEvaluatorService);
 
-  readonly childFieldTypes: readonly { type: FieldType; label: string; icon: string }[] = [
+  isChildVisible(child: FieldSchema): boolean {
+    return this.evaluator.isFieldVisible(child, this.formGroup().getRawValue());
+  }
+
+  readonly childFieldTypes: readonly ChildFieldTypeItem[] = [
     { type: FieldType.TEXT_INPUT, label: 'Text Input', icon: '📝' },
     { type: FieldType.TEXT_AREA, label: 'Textarea', icon: '📄' },
     { type: FieldType.NUMBER, label: 'Number', icon: '🔢' },
@@ -303,12 +376,27 @@ export class ContainerDropzoneComponent {
     { type: FieldType.FILE_UPLOAD, label: 'File Upload', icon: '📁' }
   ];
 
-  onSelect(event: MouseEvent, childId: string): void {
+  readonly filteredChildFieldTypes = computed(() => {
+    const q = this.searchQuery().toLowerCase().trim();
+    if (!q) return this.childFieldTypes;
+    return this.childFieldTypes.filter(ft => 
+      ft.label.toLowerCase().includes(q) || 
+      ft.type.toLowerCase().includes(q)
+    );
+  });
+
+  openAddModal(event: MouseEvent): void {
     event.stopPropagation();
-    this.state.openConfigModal(childId);
+    this.searchQuery.set('');
+    this.isAddModalOpen.set(true);
   }
 
-  openSettings(childId: string, event: MouseEvent): void {
+  onSelectFieldType(type: FieldType): void {
+    this.state.addChildField(this.containerId(), this.itemId(), type);
+    this.isAddModalOpen.set(false);
+  }
+
+  onSelect(event: MouseEvent, childId: string): void {
     event.stopPropagation();
     this.state.openConfigModal(childId);
   }
@@ -336,12 +424,6 @@ export class ContainerDropzoneComponent {
     event.stopPropagation();
     this.state.addFieldAfter(childId, type);
     this.messageService.success('Đã thêm trường phía sau');
-  }
-
-  onAdd(type: FieldType, event: MouseEvent): void {
-    event.stopPropagation();
-    this.state.addChildField(this.containerId(), this.itemId(), type);
-    this.messageService.success('Đã thêm trường vào Container');
   }
 
   onDrop(event: CdkDragDrop<FieldSchema[], unknown, FieldType>): void {

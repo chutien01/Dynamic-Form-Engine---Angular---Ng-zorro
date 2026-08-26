@@ -20,6 +20,11 @@ export class StepsFieldBuilder extends BaseFieldBuilder<StepsFieldSchema> {
     return this;
   }
 
+  setSize(size: 'default' | 'small'): this {
+    this.schema.size = size;
+    return this;
+  }
+
   setItems(items: ContainerChildItem[]): this {
     this.schema.items = items;
     return this;

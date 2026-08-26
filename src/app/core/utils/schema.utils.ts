@@ -1,4 +1,3 @@
-import { moveItemInArray } from '@angular/cdk/drag-drop';
 import { v4 as uuidv4 } from 'uuid';
 import { 
   FieldSchema, 
@@ -8,6 +7,21 @@ import {
   CollapseFieldSchema, 
   StepsFieldSchema 
 } from '../models/schema.model';
+
+/**
+ * Di chuyển phần tử trong mảng thuần TypeScript (không phụ thuộc Angular CDK)
+ */
+export function moveItemInArray<T>(array: T[], fromIndex: number, toIndex: number): void {
+  const from = Math.max(0, Math.min(array.length - 1, fromIndex));
+  const to = Math.max(0, Math.min(array.length - 1, toIndex));
+  if (from === to) return;
+  const target = array[from];
+  const delta = to < from ? -1 : 1;
+  for (let i = from; i !== to; i += delta) {
+    array[i] = array[i + delta];
+  }
+  array[to] = target;
+}
 
 /**
  * Trích xuất toàn bộ các field lá (form controls thực tế) kể cả khi nằm sâu trong Tabs/Collapse/Steps/Card
@@ -359,3 +373,70 @@ export function moveChildFieldInContainer(
     return f;
   });
 }
+
+export interface TriggerFieldItem {
+  id: string;
+  key: string;
+  label: string;
+  type: FieldType;
+  path: string;
+  groupName: string;
+  fullDisplay: string;
+  field: FieldSchema;
+}
+
+/**
+ * Trích xuất toàn bộ các leaf fields kèm đường dẫn cha (Tabs / Card / Collapse / Steps)
+ * để hiển thị trực quan ngữ cảnh trong dropdown chọn điều kiện Conditional Logic
+ */
+export function extractAllTriggerFieldsWithPath(fields: FieldSchema[]): TriggerFieldItem[] {
+  const result: TriggerFieldItem[] = [];
+
+  function traverse(list: FieldSchema[], parentPath: string, parentGroup: string) {
+    if (!Array.isArray(list)) return;
+    for (const f of list) {
+      if (f.type === FieldType.CARD && 'fields' in f && Array.isArray(f.fields)) {
+        const cardTitle = f.label || 'Card Section';
+        traverse(f.fields, `${parentPath ? parentPath + ' > ' : ''}Card: ${cardTitle}`, `💳 ${cardTitle}`);
+      } else if (
+        (f.type === FieldType.TABS || f.type === FieldType.COLLAPSE || f.type === FieldType.STEPS) &&
+        'items' in f && Array.isArray(f.items)
+      ) {
+        const containerPrefix = f.type === FieldType.TABS ? '🗂️' : (f.type === FieldType.COLLAPSE ? '🪗' : '🪜');
+        const containerTitle = f.label || (f.type === FieldType.TABS ? 'Tabs' : (f.type === FieldType.COLLAPSE ? 'Collapse' : 'Steps'));
+        for (let i = 0; i < f.items.length; i++) {
+          const item = f.items[i];
+          const itemTitle = item.title || `Mục ${i + 1}`;
+          const itemIcon = f.type === FieldType.TABS ? '📑' : (f.type === FieldType.COLLAPSE ? '📄' : '📍');
+          const currentPath = `${parentPath ? parentPath + ' > ' : ''}${containerTitle} > ${itemTitle}`;
+          const currentGroup = `${containerPrefix} ${containerTitle} > ${itemIcon} ${itemTitle}`;
+          if (Array.isArray(item.fields)) {
+            traverse(item.fields, currentPath, currentGroup);
+          }
+        }
+      } else {
+        const key = f.key || f.id;
+        let label = (f.label || '').trim();
+        if (!label) {
+          label = `${f.type.replace(/_/g, ' ').toUpperCase()}`;
+        }
+        const group = parentGroup || '🌟 Trường ngoài (Root)';
+        const fullDisplay = parentPath ? `[${parentPath}] ${label} (${key})` : `${label} (${key})`;
+        result.push({
+          id: f.id,
+          key,
+          label,
+          type: f.type,
+          path: parentPath || 'Root',
+          groupName: group,
+          fullDisplay,
+          field: f
+        });
+      }
+    }
+  }
+
+  traverse(fields, '', '');
+  return result;
+}
+

@@ -20,6 +20,11 @@ export class CollapseFieldBuilder extends BaseFieldBuilder<CollapseFieldSchema> 
     return this;
   }
 
+  setBordered(bordered: boolean): this {
+    this.schema.bordered = bordered;
+    return this;
+  }
+
   setItems(items: ContainerChildItem[]): this {
     this.schema.items = items;
     return this;
