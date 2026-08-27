@@ -176,4 +176,57 @@ describe('FormBuilderStateService Actions', () => {
     expect(card.fields[1].id).toBe(child1Id);
     expect(card.fields[2].id).toBe(afterId);
   });
+
+  it('should include container dropzone IDs before canvasList in connectedDropLists', () => {
+    const cardId = service.addField(FieldType.CARD, 0);
+    const tabsId = service.addField(FieldType.TABS, 1);
+
+    const dropLists = service.connectedDropLists();
+    
+    // canvasList must be at the very end so CDK tests inner containers first
+    expect(dropLists[dropLists.length - 1]).toBe('canvasList');
+    expect(dropLists).toContain(`container_${cardId}`);
+
+    // Tabs container child items should also have dropzone IDs
+    const tabsField = service.schema().fields[1] as TabsFieldSchema;
+    for (const item of tabsField.items) {
+      expect(dropLists).toContain(`container_${item.id}`);
+    }
+  });
+
+  it('should transfer an existing field from Canvas into a Container', () => {
+    const cardId = service.addField(FieldType.CARD, 0);
+    const textId = service.addField(FieldType.TEXT_INPUT, 1);
+    const textSchema = service.schema().fields.find(f => f.id === textId)!;
+
+    expect(service.schema().fields.length).toBe(2);
+
+    service.transferFieldToContainer(textSchema, cardId, null, 0);
+
+    const updatedFields = service.schema().fields;
+    expect(updatedFields.length).toBe(1); // Only Card remains on canvas
+    expect(updatedFields[0].id).toBe(cardId);
+
+    const card = updatedFields[0] as CardFieldSchema;
+    expect(card.fields.length).toBe(1);
+    expect(card.fields[0].id).toBe(textId);
+    expect(service.activeFieldId()).toBe(textId);
+  });
+
+  it('should transfer an existing field from a Container out to the Canvas', () => {
+    const cardId = service.addField(FieldType.CARD, 0);
+    const childId = service.addChildField(cardId, null, FieldType.TEXT_INPUT);
+    const childSchema = (service.schema().fields[0] as CardFieldSchema).fields.find(f => f.id === childId)!;
+
+    service.transferFieldToCanvas(childSchema, 1);
+
+    const updatedFields = service.schema().fields;
+    expect(updatedFields.length).toBe(2);
+    expect(updatedFields[0].id).toBe(cardId);
+    expect(updatedFields[1].id).toBe(childId);
+
+    const card = updatedFields[0] as CardFieldSchema;
+    expect(card.fields.length).toBe(0);
+    expect(service.activeFieldId()).toBe(childId);
+  });
 });
