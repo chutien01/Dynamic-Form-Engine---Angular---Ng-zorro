@@ -38,6 +38,7 @@
           [class.hover:border-blue-300]="state.activeFieldId() !== field.id"
           (click)="onFieldClick($event, field.id)"
           cdkDrag
+          [cdkDragData]="field"
         >
           <!-- Custom Drag Placeholder -->
           <div 

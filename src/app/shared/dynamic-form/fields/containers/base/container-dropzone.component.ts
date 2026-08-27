@@ -41,7 +41,7 @@ export interface ChildFieldTypeItem {
       <div 
         nz-row [nzGutter]="[12, 16]"
         [id]="'container_' + (itemId() || containerId())"
-        class="min-h-[110px] items-start content-start border-2 border-dashed border-indigo-200 hover:border-indigo-400 hover:bg-indigo-50/40 rounded-xl p-3.5 bg-indigo-50/20 w-full transition-all cursor-pointer relative"
+        class="min-h-[110px] items-start content-start border-2 border-dashed border-indigo-200 hover:border-indigo-400 hover:bg-indigo-50/40 rounded-xl p-3.5 bg-indigo-50/20 w-full transition-all cursor-pointer relative [&.cdk-drop-list-receiving]:border-indigo-500 [&.cdk-drop-list-receiving]:bg-indigo-100/60 [&.cdk-drop-list-receiving]:ring-2 [&.cdk-drop-list-receiving]:ring-indigo-300 [&.cdk-drop-list-dragging]:border-indigo-300"
         cdkDropList
         [cdkDropListData]="fields()"
         [cdkDropListConnectedTo]="state.connectedDropLists()"
@@ -59,6 +59,7 @@ export interface ChildFieldTypeItem {
             [class.hover:border-blue-300]="state.activeFieldId() !== child.id"
             (click)="onSelect($event, child.id)"
             cdkDrag
+            [cdkDragData]="child"
           >
             <!-- Custom Drag Placeholder in Container -->
             <div 
@@ -426,14 +427,21 @@ export class ContainerDropzoneComponent {
     this.messageService.success('Đã thêm trường phía sau');
   }
 
-  onDrop(event: CdkDragDrop<FieldSchema[], unknown, FieldType>): void {
-    event.event.stopPropagation();
+  onDrop(event: CdkDragDrop<FieldSchema[], unknown, FieldType | FieldSchema>): void {
+    if (event.event && typeof event.event.stopPropagation === 'function') {
+      event.event.stopPropagation();
+    }
     if (event.previousContainer === event.container) {
       this.state.moveChildField(this.containerId(), this.itemId(), event.previousIndex, event.currentIndex);
     } else {
-      const fieldType = event.item.data as FieldType;
-      if (fieldType) {
-        this.state.addChildField(this.containerId(), this.itemId(), fieldType, event.currentIndex, true);
+      const data = event.item.data;
+      if (typeof data === 'string') {
+        // Kéo trường mới từ Toolbox vào
+        this.state.addChildField(this.containerId(), this.itemId(), data as FieldType, event.currentIndex, true);
+      } else if (data && typeof data === 'object' && 'id' in data) {
+        // Chuyển trường hiện có từ ngoài Canvas hoặc Container khác vào Container này
+        this.state.transferFieldToContainer(data as FieldSchema, this.containerId(), this.itemId(), event.currentIndex);
+        this.messageService.success('Đã chuyển trường vào container');
       }
     }
   }

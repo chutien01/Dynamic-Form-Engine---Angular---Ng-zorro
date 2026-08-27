@@ -11,7 +11,10 @@ import {
   addChildFieldToContainer,
   moveChildFieldInContainer,
   duplicateFieldRecursive,
-  insertFieldRelativeToTargetRecursive
+  insertFieldRelativeToTargetRecursive,
+  extractAllContainerDropListIds,
+  transferFieldToContainer,
+  transferFieldToCanvas
 } from '../../../core/utils/schema.utils';
 
 @Injectable({
@@ -35,21 +38,10 @@ export class FormBuilderStateService {
   });
 
   // Computed list of dropzone IDs (for CDK Drag and Drop connections)
+  // IMPORTANT: Container IDs must come FIRST so CDK checks child container dropzones before the root canvasList!
   readonly connectedDropLists = computed(() => {
-    const ids = ['canvasList'];
-    for (const field of this.schema().fields) {
-      if (field.type === FieldType.CARD) {
-        ids.push(`container_${field.id}`);
-      } else if (
-        (field.type === FieldType.TABS || field.type === FieldType.COLLAPSE || field.type === FieldType.STEPS) &&
-        'items' in field && Array.isArray(field.items)
-      ) {
-        for (const item of field.items) {
-          ids.push(`container_${item.id}`);
-        }
-      }
-    }
-    return ids;
+    const containerIds = extractAllContainerDropListIds(this.schema().fields);
+    return [...containerIds, 'canvasList'];
   });
 
   setActiveField(fieldId: string | null): void {
@@ -200,6 +192,28 @@ export class FormBuilderStateService {
       moveItemInArray(nextFields, previousIndex, currentIndex);
       return { ...schema, fields: nextFields };
     });
+  }
+
+  transferFieldToContainer(
+    fieldToMove: FieldSchema,
+    targetContainerId: string,
+    targetItemId: string | null,
+    targetIndex?: number
+  ): void {
+    if (fieldToMove.id === targetContainerId) return;
+    this.schema.update(current => ({
+      ...current,
+      fields: transferFieldToContainer(current.fields, fieldToMove, targetContainerId, targetItemId, targetIndex)
+    }));
+    this.setActiveField(fieldToMove.id);
+  }
+
+  transferFieldToCanvas(fieldToMove: FieldSchema, targetIndex: number): void {
+    this.schema.update(current => ({
+      ...current,
+      fields: transferFieldToCanvas(current.fields, fieldToMove, targetIndex)
+    }));
+    this.setActiveField(fieldToMove.id);
   }
 
   loadSchema(schema: FormSchema): void {

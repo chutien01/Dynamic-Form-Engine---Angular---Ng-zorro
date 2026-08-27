@@ -100,14 +100,19 @@ export class CanvasComponent {
     return type === FieldType.CARD || type === FieldType.TABS || type === FieldType.COLLAPSE || type === FieldType.STEPS;
   }
 
-  onDrop(event: CdkDragDrop<FieldSchema[], unknown, FieldType>): void {
+  onDrop(event: CdkDragDrop<FieldSchema[], unknown, FieldType | FieldSchema>): void {
     this.isDragging.set(false);
     if (event.previousContainer === event.container) {
       this.state.moveField(event.previousIndex, event.currentIndex);
     } else {
-      const fieldType = event.item.data as FieldType;
-      if (fieldType) {
-        this.state.addField(fieldType, event.currentIndex, true);
+      const data = event.item.data;
+      if (typeof data === 'string') {
+        // Kéo trường mới từ Toolbox vào
+        this.state.addField(data as FieldType, event.currentIndex, true);
+      } else if (data && typeof data === 'object' && 'id' in data) {
+        // Chuyển trường hiện có từ trong Container ra ngoài Canvas
+        this.state.transferFieldToCanvas(data as FieldSchema, event.currentIndex);
+        this.messageService.success('Đã chuyển trường ra canvas');
       }
     }
   }

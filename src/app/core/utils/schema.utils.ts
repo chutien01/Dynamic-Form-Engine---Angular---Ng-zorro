@@ -243,7 +243,7 @@ export function duplicateFieldRecursive(fields: FieldSchema[], targetId: string)
 }
 
 /**
- * Thêm field con vào Container (Card hoặc Tab/Panel/Step cụ thể)
+ * Thêm field con vào Container (Card hoặc Tab/Panel/Step cụ thể) - Hỗ trợ đệ quy đa tầng
  */
 export function addChildFieldToContainer(
   fields: FieldSchema[], 
@@ -261,7 +261,7 @@ export function addChildFieldToContainer(
         } else {
           nextFields.push(newField);
         }
-        return { ...f, fields: nextFields };
+        return { ...f, fields: nextFields } as FieldSchema;
       }
       if (
         (f.type === FieldType.TABS || f.type === FieldType.COLLAPSE || f.type === FieldType.STEPS) &&
@@ -281,9 +281,32 @@ export function addChildFieldToContainer(
             }
             return item;
           })
-        };
+        } as FieldSchema;
       }
     }
+
+    // Đệ quy tìm kiếm container lồng bên trong
+    if (f.type === FieldType.CARD && 'fields' in f && Array.isArray(f.fields)) {
+      return {
+        ...f,
+        fields: addChildFieldToContainer(f.fields, containerId, itemId, newField, targetIndex)
+      } as FieldSchema;
+    }
+    if (
+      (f.type === FieldType.TABS || f.type === FieldType.COLLAPSE || f.type === FieldType.STEPS) &&
+      'items' in f && Array.isArray(f.items)
+    ) {
+      return {
+        ...f,
+        items: f.items.map(item => ({
+          ...item,
+          fields: Array.isArray(item.fields)
+            ? addChildFieldToContainer(item.fields, containerId, itemId, newField, targetIndex)
+            : []
+        }))
+      } as FieldSchema;
+    }
+
     return f;
   });
 }
@@ -337,7 +360,7 @@ export function insertFieldRelativeToTargetRecursive(
 }
 
 /**
- * Di chuyển vị trí sắp xếp field con trong Container
+ * Di chuyển vị trí sắp xếp field con trong Container - Hỗ trợ đệ quy đa tầng
  */
 export function moveChildFieldInContainer(
   fields: FieldSchema[],
@@ -351,7 +374,7 @@ export function moveChildFieldInContainer(
       if (f.type === FieldType.CARD && Array.isArray(f.fields)) {
         const nextFields = [...f.fields];
         moveItemInArray(nextFields, previousIndex, currentIndex);
-        return { ...f, fields: nextFields };
+        return { ...f, fields: nextFields } as FieldSchema;
       }
       if (
         (f.type === FieldType.TABS || f.type === FieldType.COLLAPSE || f.type === FieldType.STEPS) &&
@@ -367,11 +390,163 @@ export function moveChildFieldInContainer(
             }
             return item;
           })
-        };
+        } as FieldSchema;
       }
     }
+
+    // Đệ quy tìm kiếm container lồng bên trong
+    if (f.type === FieldType.CARD && 'fields' in f && Array.isArray(f.fields)) {
+      return {
+        ...f,
+        fields: moveChildFieldInContainer(f.fields, containerId, itemId, previousIndex, currentIndex)
+      } as FieldSchema;
+    }
+    if (
+      (f.type === FieldType.TABS || f.type === FieldType.COLLAPSE || f.type === FieldType.STEPS) &&
+      'items' in f && Array.isArray(f.items)
+    ) {
+      return {
+        ...f,
+        items: f.items.map(item => ({
+          ...item,
+          fields: Array.isArray(item.fields)
+            ? moveChildFieldInContainer(item.fields, containerId, itemId, previousIndex, currentIndex)
+            : []
+        }))
+      } as FieldSchema;
+    }
+
     return f;
   });
+}
+
+/**
+ * Trích xuất toàn bộ danh sách ID của các vùng dropzone trong container (Card, Tabs, Collapse, Steps)
+ * Trả về danh sách với thứ tự vùng chứa con (sâu nhất) ở trước để CDK ưu tiên kiểm tra trước parent canvas.
+ */
+export function extractAllContainerDropListIds(fields: FieldSchema[]): string[] {
+  const ids: string[] = [];
+
+  function traverse(list: FieldSchema[]) {
+    if (!Array.isArray(list)) return;
+    for (const f of list) {
+      if (f.type === FieldType.CARD) {
+        ids.push(`container_${f.id}`);
+        if (Array.isArray(f.fields)) {
+          traverse(f.fields);
+        }
+      } else if (
+        (f.type === FieldType.TABS || f.type === FieldType.COLLAPSE || f.type === FieldType.STEPS) &&
+        'items' in f && Array.isArray(f.items)
+      ) {
+        for (const item of f.items) {
+          ids.push(`container_${item.id}`);
+          if (Array.isArray(item.fields)) {
+            traverse(item.fields);
+          }
+        }
+      }
+    }
+  }
+
+  traverse(fields);
+  // Đảo ngược để các container lồng sâu nhất xuất hiện trước
+  return ids.reverse();
+}
+
+/**
+ * Chuyển một field hiện có vào một Container ở vị trí targetIndex cụ thể,
+ * đồng thời xóa field đó khỏi vị trí cũ trong schema
+ */
+export function transferFieldToContainer(
+  fields: FieldSchema[],
+  fieldToMove: FieldSchema,
+  targetContainerId: string,
+  targetItemId: string | null,
+  targetIndex?: number
+): FieldSchema[] {
+  // 1. Xóa field khỏi vị trí cũ ở bất kỳ đâu trong cây schema
+  const fieldsWithoutItem = deleteFieldRecursive(fields, fieldToMove.id);
+
+  // 2. Chèn field vào container đích
+  function insertRecursive(list: FieldSchema[]): FieldSchema[] {
+    return list.map(f => {
+      if (f.id === targetContainerId) {
+        if (f.type === FieldType.CARD) {
+          const nextFields = [...(f.fields || [])];
+          if (targetIndex !== undefined && targetIndex >= 0) {
+            nextFields.splice(targetIndex, 0, fieldToMove);
+          } else {
+            nextFields.push(fieldToMove);
+          }
+          return { ...f, fields: nextFields } as FieldSchema;
+        }
+        if (
+          (f.type === FieldType.TABS || f.type === FieldType.COLLAPSE || f.type === FieldType.STEPS) &&
+          Array.isArray(f.items)
+        ) {
+          return {
+            ...f,
+            items: f.items.map((item, idx) => {
+              if (targetItemId ? item.id === targetItemId : idx === 0) {
+                const nextFields = [...(item.fields || [])];
+                if (targetIndex !== undefined && targetIndex >= 0) {
+                  nextFields.splice(targetIndex, 0, fieldToMove);
+                } else {
+                  nextFields.push(fieldToMove);
+                }
+                return { ...item, fields: nextFields };
+              }
+              return item;
+            })
+          } as FieldSchema;
+        }
+      }
+
+      // Đệ quy tìm kiếm container lồng nhau
+      if (f.type === FieldType.CARD && 'fields' in f && Array.isArray(f.fields)) {
+        return {
+          ...f,
+          fields: insertRecursive(f.fields)
+        } as FieldSchema;
+      }
+      if (
+        (f.type === FieldType.TABS || f.type === FieldType.COLLAPSE || f.type === FieldType.STEPS) &&
+        'items' in f && Array.isArray(f.items)
+      ) {
+        return {
+          ...f,
+          items: f.items.map(item => ({
+            ...item,
+            fields: Array.isArray(item.fields) ? insertRecursive(item.fields) : []
+          }))
+        } as FieldSchema;
+      }
+
+      return f;
+    });
+  }
+
+  return insertRecursive(fieldsWithoutItem);
+}
+
+/**
+ * Chuyển một field hiện có ra Canvas gốc ở vị trí targetIndex cụ thể,
+ * đồng thời xóa field đó khỏi container cũ
+ */
+export function transferFieldToCanvas(
+  fields: FieldSchema[],
+  fieldToMove: FieldSchema,
+  targetIndex: number
+): FieldSchema[] {
+  // 1. Xóa field khỏi vị trí cũ trong cây
+  const fieldsWithoutItem = deleteFieldRecursive(fields, fieldToMove.id);
+
+  // 2. Chèn vào mảng gốc ở targetIndex
+  const nextFields = [...fieldsWithoutItem];
+  const safeIndex = Math.max(0, Math.min(nextFields.length, targetIndex));
+  nextFields.splice(safeIndex, 0, fieldToMove);
+  return nextFields;
 }
 
 export interface TriggerFieldItem {
